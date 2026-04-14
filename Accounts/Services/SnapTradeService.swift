@@ -133,7 +133,8 @@ final class SnapTradeService {
             "path": .string("/api/v1\(path)"),
             "query": .string(query)
         ]))
-        let signature = hmacSHA256Base64(message: signaturePayload, key: credentials.consumerKey)
+        let signingKey = credentials.consumerKey.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? credentials.consumerKey
+        let signature = hmacSHA256Base64(message: signaturePayload, key: signingKey)
 
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -145,6 +146,8 @@ final class SnapTradeService {
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
             let message = String(data: data, encoding: .utf8) ?? "HTTP \(status)"
+            DebugLog.write("SnapTrade request failed status=\(status) method=\(method) path=\(path)")
+            DebugLog.write("SnapTrade signature payload=\(signaturePayload)")
             throw SnapTradeError.api(message)
         }
 
