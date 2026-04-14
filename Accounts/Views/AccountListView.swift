@@ -101,7 +101,11 @@ struct AccountListView: View {
         let investmentHoldings = accounts
             .filter { $0.accountType == .investment }
             .flatMap { $0.holdings }
+        let investmentCash = accounts
+            .filter { $0.accountType == .investment }
+            .flatMap { $0.cashBalances }
         await PriceService.shared.refreshHoldings(investmentHoldings)
+        await PriceService.shared.refreshCashBalances(investmentCash)
 
         // Refresh bank balances (each account has its own refresh token)
         for account in accounts where account.accountType == .bankAccount {

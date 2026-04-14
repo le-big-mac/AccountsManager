@@ -1,6 +1,7 @@
 import Foundation
 
 enum CSVPlatformFormat {
+    case genericPortfolio
     case vanguardUK
     case robinhood
     case interactiveInvestor
@@ -8,6 +9,7 @@ enum CSVPlatformFormat {
 
     var description: String {
         switch self {
+        case .genericPortfolio: "Generic Portfolio"
         case .vanguardUK: "Vanguard UK"
         case .robinhood: "Robinhood"
         case .interactiveInvestor: "Interactive Investor"
@@ -20,8 +22,15 @@ struct ParsedHolding {
     let name: String
     let ticker: String?
     let isin: String?
+    let sedol: String?
     let units: Decimal
     let priceCurrency: String
+}
+
+struct ParsedCashBalance {
+    let name: String
+    let amount: Decimal
+    let currency: String
 }
 
 struct CSVParser {
@@ -31,6 +40,7 @@ struct CSVParser {
         let rows: [[String]]
         let detectedFormat: CSVPlatformFormat
         let holdings: [ParsedHolding]
+        let cashBalances: [ParsedCashBalance]
     }
 
     func parse(url: URL) throws -> ParsedCSV {
@@ -40,20 +50,27 @@ struct CSVParser {
             throw CSVError.emptyFile
         }
 
-        let headers = parseRow(headerLine)
-        let rows = lines.dropFirst().map { parseRow($0) }
+        let delimiter = detectDelimiter(headerLine)
+        let headers = parseRow(headerLine, delimiter: delimiter)
+        let rows = lines.dropFirst().map { parseRow($0, delimiter: delimiter) }
         let format = detectFormat(headers: headers)
         let holdings = extractHoldings(headers: headers, rows: rows, format: format)
+        let cashBalances = extractCashBalances(headers: headers, rows: rows, format: format)
 
         return ParsedCSV(
             headers: headers,
             rows: Array(rows),
             detectedFormat: format,
-            holdings: holdings
+            holdings: holdings,
+            cashBalances: cashBalances
         )
     }
 
-    private func parseRow(_ line: String) -> [String] {
+    private func detectDelimiter(_ line: String) -> Character {
+        line.filter { $0 == "\t" }.count > line.filter { $0 == "," }.count ? "\t" : ","
+    }
+
+    private func parseRow(_ line: String, delimiter: Character) -> [String] {
         var fields: [String] = []
         var current = ""
         var inQuotes = false
@@ -61,7 +78,7 @@ struct CSVParser {
         for char in line {
             if char == "\"" {
                 inQuotes.toggle()
-            } else if char == "," && !inQuotes {
+            } else if char == delimiter && !inQuotes {
                 fields.append(current.trimmingCharacters(in: .whitespaces))
                 current = ""
             } else {
@@ -74,6 +91,13 @@ struct CSVParser {
 
     private func detectFormat(headers: [String]) -> CSVPlatformFormat {
         let joined = headers.joined(separator: " ").lowercased()
+        let normalized = headers.map(normalizedHeader)
+
+        if normalized.contains("type") &&
+            (normalized.contains("cashbalance") || normalized.contains("cash")) &&
+            normalized.contains("currency") {
+            return .genericPortfolio
+        }
 
         if joined.contains("investment name") && joined.contains("share price") && joined.contains("trade date") {
             return .vanguardUK
@@ -92,6 +116,8 @@ struct CSVParser {
 
     private func extractHoldings(headers: [String], rows: [[String]], format: CSVPlatformFormat) -> [ParsedHolding] {
         switch format {
+        case .genericPortfolio:
+            return extractGenericPortfolioHoldings(headers: headers, rows: rows)
         case .vanguardUK:
             return extractVanguardHoldings(headers: headers, rows: rows)
         case .robinhood:
@@ -100,6 +126,72 @@ struct CSVParser {
             return extractIIHoldings(headers: headers, rows: rows)
         case .unknown:
             return []
+        }
+    }
+
+    private func extractCashBalances(headers: [String], rows: [[String]], format: CSVPlatformFormat) -> [ParsedCashBalance] {
+        switch format {
+        case .genericPortfolio:
+            return extractGenericCashBalances(headers: headers, rows: rows)
+        default:
+            return []
+        }
+    }
+
+    // MARK: - Generic Portfolio
+
+    private func extractGenericPortfolioHoldings(headers: [String], rows: [[String]]) -> [ParsedHolding] {
+        let index = headerIndex(headers)
+        guard let nameIdx = index["name"],
+              let unitsIdx = index["units"],
+              let currencyIdx = index["currency"] else {
+            return []
+        }
+
+        let typeIdx = index["type"]
+        let tickerIdx = index["ticker"]
+        let isinIdx = index["isin"]
+        let sedolIdx = index["sedol"]
+
+        return rows.compactMap { row in
+            let type = value(row, at: typeIdx)?.lowercased() ?? "security"
+            guard type.isEmpty || type == "security" || type == "holding" else { return nil }
+            guard let name = value(row, at: nameIdx), !name.isEmpty,
+                  let unitsText = value(row, at: unitsIdx),
+                  let units = parseDecimal(unitsText),
+                  units != 0 else { return nil }
+
+            return ParsedHolding(
+                name: name,
+                ticker: value(row, at: tickerIdx).flatMap(nonEmpty),
+                isin: value(row, at: isinIdx).flatMap(nonEmpty),
+                sedol: value(row, at: sedolIdx).flatMap(nonEmpty),
+                units: abs(units),
+                priceCurrency: value(row, at: currencyIdx).flatMap(nonEmpty) ?? "GBP"
+            )
+        }
+    }
+
+    private func extractGenericCashBalances(headers: [String], rows: [[String]]) -> [ParsedCashBalance] {
+        let index = headerIndex(headers)
+        guard let typeIdx = index["type"],
+              let currencyIdx = index["currency"] else {
+            return []
+        }
+
+        let nameIdx = index["name"]
+        let amountIdx = index["cashbalance"] ?? index["cash"]
+
+        guard let amountIdx else { return [] }
+
+        return rows.compactMap { row in
+            guard value(row, at: typeIdx)?.lowercased() == "cash",
+                  let amountText = value(row, at: amountIdx),
+                  let amount = parseDecimal(amountText) else { return nil }
+
+            let currency = value(row, at: currencyIdx).flatMap(nonEmpty) ?? "GBP"
+            let name = value(row, at: nameIdx).flatMap(nonEmpty) ?? "\(currency) Cash"
+            return ParsedCashBalance(name: name, amount: amount, currency: currency)
         }
     }
 
@@ -124,7 +216,7 @@ struct CSVParser {
         }
 
         return holdingMap.map { name, units in
-            ParsedHolding(name: name, ticker: nil, isin: nil, units: abs(units), priceCurrency: "GBP")
+            ParsedHolding(name: name, ticker: nil, isin: nil, sedol: nil, units: abs(units), priceCurrency: "GBP")
         }
     }
 
@@ -153,7 +245,7 @@ struct CSVParser {
         }
 
         return holdingMap.map { key, value in
-            ParsedHolding(name: value.name, ticker: key, isin: nil, units: abs(value.units), priceCurrency: "USD")
+            ParsedHolding(name: value.name, ticker: key, isin: nil, sedol: nil, units: abs(value.units), priceCurrency: "USD")
         }.filter { $0.units > 0 }
     }
 
@@ -181,8 +273,41 @@ struct CSVParser {
         }
 
         return holdingMap.map { _, value in
-            ParsedHolding(name: value.name, ticker: nil, isin: nil, units: abs(value.units), priceCurrency: "GBP")
+            ParsedHolding(name: value.name, ticker: nil, isin: nil, sedol: value.sedol, units: abs(value.units), priceCurrency: "GBP")
         }.filter { $0.units > 0 }
+    }
+
+    // MARK: - Helpers
+
+    private func headerIndex(_ headers: [String]) -> [String: Int] {
+        Dictionary(uniqueKeysWithValues: headers.enumerated().map { index, header in
+            (normalizedHeader(header), index)
+        })
+    }
+
+    private func normalizedHeader(_ header: String) -> String {
+        header
+            .lowercased()
+            .filter { $0.isLetter || $0.isNumber }
+    }
+
+    private func value(_ row: [String], at index: Int?) -> String? {
+        guard let index, row.indices.contains(index) else { return nil }
+        return row[index].trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func nonEmpty(_ value: String) -> String? {
+        value.isEmpty ? nil : value
+    }
+
+    private func parseDecimal(_ value: String) -> Decimal? {
+        let cleaned = value
+            .replacingOccurrences(of: "£", with: "")
+            .replacingOccurrences(of: "$", with: "")
+            .replacingOccurrences(of: "€", with: "")
+            .replacingOccurrences(of: ",", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return Decimal(string: cleaned)
     }
 }
 

@@ -121,6 +121,7 @@ struct AccountDetailView: View {
         isRefreshing = true
         defer { isRefreshing = false }
         await PriceService.shared.refreshHoldings(account.holdings)
+        await PriceService.shared.refreshCashBalances(account.cashBalances)
     }
 
     private func syncBalance() async {

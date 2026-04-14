@@ -69,7 +69,7 @@ struct CSVImportView: View {
                       systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
                 Spacer()
-                Text("\(parsed.holdings.count) holdings found")
+                Text("\(parsed.holdings.count) holdings, \(parsed.cashBalances.count) cash lines")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -96,13 +96,29 @@ struct CSVImportView: View {
                         }
                         Divider()
                     }
+                    ForEach(parsed.cashBalances.indices, id: \.self) { i in
+                        let cash = parsed.cashBalances[i]
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(cash.name)
+                                    .font(.subheadline)
+                                Text(cash.currency)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Text(cash.amount.formattedCurrency(code: cash.currency))
+                                .font(.subheadline.monospacedDigit())
+                        }
+                        Divider()
+                    }
                 }
             }
 
             HStack {
                 Spacer()
                 Button("Import") {
-                    importHoldings(parsed.holdings)
+                    importSnapshot(parsed)
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent)
@@ -142,8 +158,13 @@ struct CSVImportView: View {
         }
     }
 
-    private func importHoldings(_ parsed: [ParsedHolding]) {
-        for h in parsed {
+    private func importSnapshot(_ parsed: CSVParser.ParsedCSV) {
+        importHoldings(parsed.holdings)
+        importCashBalances(parsed.cashBalances)
+    }
+
+    private func importHoldings(_ holdings: [ParsedHolding]) {
+        for h in holdings {
             if let existing = account.holdings.first(where: {
                 ($0.ticker != nil && $0.ticker == h.ticker) || $0.name == h.name
             }) {
@@ -158,6 +179,23 @@ struct CSVImportView: View {
                     priceCurrency: h.priceCurrency
                 )
                 account.holdings.append(holding)
+            }
+        }
+    }
+
+    private func importCashBalances(_ cashBalances: [ParsedCashBalance]) {
+        for cash in cashBalances {
+            if let existing = account.cashBalances.first(where: {
+                $0.currency == cash.currency && $0.name == cash.name
+            }) {
+                existing.amount = cash.amount
+                existing.updatedAt = Date()
+            } else {
+                account.cashBalances.append(CashBalance(
+                    name: cash.name,
+                    amount: cash.amount,
+                    currency: cash.currency
+                ))
             }
         }
     }

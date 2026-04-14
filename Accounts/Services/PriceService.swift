@@ -151,6 +151,19 @@ final class PriceService {
         }
     }
 
+    func refreshCashBalances(_ cashBalances: [CashBalance]) async {
+        for cash in cashBalances {
+            do {
+                let fxRate = try await fetchFXRateToGBP(from: cash.currency)
+                cash.fxRateToGBP = fxRate
+                cash.fxRateDate = Date()
+                cash.updatedAt = Date()
+            } catch {
+                continue
+            }
+        }
+    }
+
     func clearCache() {
         cache.removeAll()
         fxCache.removeAll()
