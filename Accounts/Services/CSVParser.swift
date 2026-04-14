@@ -94,7 +94,7 @@ struct CSVParser {
         let normalized = headers.map(normalizedHeader)
 
         if normalized.contains("type") &&
-            (normalized.contains("cashbalance") || normalized.contains("cash")) &&
+            normalized.contains("units") &&
             normalized.contains("currency") {
             return .genericPortfolio
         }
@@ -180,9 +180,7 @@ struct CSVParser {
         }
 
         let nameIdx = index["name"]
-        let amountIdx = index["cashbalance"] ?? index["cash"]
-
-        guard let amountIdx else { return [] }
+        guard let amountIdx = index["units"] else { return [] }
 
         return rows.compactMap { row in
             guard value(row, at: typeIdx)?.lowercased() == "cash",
