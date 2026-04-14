@@ -136,7 +136,7 @@ struct CSVImportView: View {
 
     private func openFilePicker() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [UTType.commaSeparatedText]
+        panel.allowedContentTypes = [.commaSeparatedText, .text]
         panel.allowsMultipleSelection = false
 
         if panel.runModal() == .OK, let url = panel.url {

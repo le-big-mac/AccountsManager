@@ -8,7 +8,8 @@ struct AccountListView: View {
 
     @Environment(\.modelContext) private var modelContext
     @State private var showingAddAccount = false
-    @State private var showingCSVImport = false
+    @State private var importingCSVAccount: Account?
+    @State private var queuedCSVImportAccount: Account?
     @State private var showingSettings = false
     @State private var selectedAccount: Account?
     @State private var isRefreshing = false
@@ -85,8 +86,21 @@ struct AccountListView: View {
                 )
             }
         }
-        .sheet(isPresented: $showingAddAccount) {
-            AddAccountSheet()
+        .sheet(isPresented: $showingAddAccount, onDismiss: {
+            if let account = queuedCSVImportAccount {
+                queuedCSVImportAccount = nil
+                importingCSVAccount = account
+            }
+        }) {
+            AddAccountSheet { account in
+                selectedAccount = account
+                if account.accountType == .investment {
+                    queuedCSVImportAccount = account
+                }
+            }
+        }
+        .sheet(item: $importingCSVAccount) { account in
+            CSVImportView(account: account)
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView()
