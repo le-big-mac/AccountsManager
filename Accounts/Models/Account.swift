@@ -4,6 +4,13 @@ import SwiftData
 enum InvestmentSourceType: String {
     case csvFile
     case snapTrade
+
+    var displayName: String {
+        switch self {
+        case .csvFile: "CSV File"
+        case .snapTrade: "SnapTrade"
+        }
+    }
 }
 
 @Model
@@ -18,6 +25,10 @@ final class Account {
     var csvSourcePath: String?
     var csvSourceFormatRaw: String?
     var csvSourceImportedAt: Date?
+    var snapTradeAccountId: String?
+    var snapTradeAuthorizationId: String?
+    var snapTradeInstitutionName: String?
+    var snapTradeSyncedAt: Date?
     var sortOrder: Int
     var isArchived: Bool
     var createdAt: Date

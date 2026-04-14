@@ -6,6 +6,8 @@ struct SettingsView: View {
     @State private var fmpApiKey: String = KeychainHelper.load(.fmpApiKey) ?? ""
     @State private var tlClientId: String = KeychainHelper.load(.trueLayerClientId) ?? ""
     @State private var tlClientSecret: String = KeychainHelper.load(.trueLayerClientSecret) ?? ""
+    @State private var snapTradeClientId: String = KeychainHelper.load(.snapTradeClientId) ?? ""
+    @State private var snapTradeConsumerKey: String = KeychainHelper.load(.snapTradeConsumerKey) ?? ""
 
     var body: some View {
         Form {
@@ -26,9 +28,19 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section("SnapTrade (Robinhood)") {
+                TextField("Client ID", text: $snapTradeClientId)
+                    .textFieldStyle(.roundedBorder)
+                SecureField("Consumer Key", text: $snapTradeConsumerKey)
+                    .textFieldStyle(.roundedBorder)
+                Text("Used to connect Robinhood through SnapTrade's read-only Connection Portal")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 450, height: 320)
+        .frame(width: 450, height: 430)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -51,6 +63,12 @@ struct SettingsView: View {
         }
         if !tlClientSecret.isEmpty {
             KeychainHelper.save(tlClientSecret, for: .trueLayerClientSecret)
+        }
+        if !snapTradeClientId.isEmpty {
+            KeychainHelper.save(snapTradeClientId, for: .snapTradeClientId)
+        }
+        if !snapTradeConsumerKey.isEmpty {
+            KeychainHelper.save(snapTradeConsumerKey, for: .snapTradeConsumerKey)
         }
     }
 }

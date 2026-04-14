@@ -7,6 +7,7 @@ struct AccountDetailView: View {
     @State private var isRefreshing = false
     @State private var showingCSVImport = false
     @State private var showingBankConnection = false
+    @State private var showingSnapTradeConnection = false
 
     var body: some View {
         ScrollView {
@@ -34,22 +35,35 @@ struct AccountDetailView: View {
                     HoldingsView(account: account)
 
                     HStack {
-                        if let csvSourcePath = account.csvSourcePath {
+                        if account.investmentSourceType == .snapTrade {
+                            Label(account.snapTradeInstitutionName ?? "SnapTrade", systemImage: "link")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else if let csvSourcePath = account.csvSourcePath {
                             Label(URL(fileURLWithPath: csvSourcePath).lastPathComponent, systemImage: "link")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Button {
-                            showingCSVImport = true
-                        } label: {
-                            Label("Import CSV", systemImage: "doc.badge.plus")
+
+                        if account.investmentSourceType == .snapTrade {
+                            Button {
+                                showingSnapTradeConnection = true
+                            } label: {
+                                Label(account.snapTradeAccountId == nil ? "Connect Robinhood" : "Reconnect", systemImage: "link.badge.plus")
+                            }
+                        } else {
+                            Button {
+                                showingCSVImport = true
+                            } label: {
+                                Label("Import CSV", systemImage: "doc.badge.plus")
+                            }
                         }
 
                         Button {
                             Task { await refreshPrices() }
                         } label: {
-                            Label(isRefreshing ? "Refreshing..." : "Refresh Prices",
+                            Label(isRefreshing ? "Refreshing..." : refreshLabel,
                                   systemImage: "arrow.clockwise")
                         }
                         .disabled(isRefreshing)
@@ -89,6 +103,13 @@ struct AccountDetailView: View {
         .sheet(isPresented: $showingBankConnection) {
             BankConnectionView(account: account)
         }
+        .sheet(isPresented: $showingSnapTradeConnection) {
+            SnapTradeConnectionView(account: account)
+        }
+    }
+
+    private var refreshLabel: String {
+        account.investmentSourceType == .snapTrade ? "Sync SnapTrade" : "Refresh Prices"
     }
 
     @ViewBuilder
@@ -126,6 +147,11 @@ struct AccountDetailView: View {
     private func refreshPrices() async {
         isRefreshing = true
         defer { isRefreshing = false }
+        if account.investmentSourceType == .snapTrade {
+            try? await SnapTradeImportService.sync(account: account, refreshConnection: true)
+            return
+        }
+
         PortfolioImportService.refreshLinkedCSV(for: account)
         await PriceService.shared.refreshHoldings(account.holdings)
         await PriceService.shared.refreshCashBalances(account.cashBalances)

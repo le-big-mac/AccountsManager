@@ -9,6 +9,7 @@ struct AddAccountSheet: View {
 
     @State private var name = ""
     @State private var accountType: AccountType = .investment
+    @State private var investmentSource: InvestmentSourceType = .csvFile
     @State private var pendingAccount: Account?
     @State private var showingBankConnection = false
 
@@ -21,6 +22,13 @@ struct AddAccountSheet: View {
                 Picker("Type", selection: $accountType) {
                     ForEach(AccountType.allCases) { type in
                         Text(type.displayName).tag(type)
+                    }
+                }
+
+                if accountType == .investment {
+                    Picker("Source", selection: $investmentSource) {
+                        Text(InvestmentSourceType.csvFile.displayName).tag(InvestmentSourceType.csvFile)
+                        Text(InvestmentSourceType.snapTrade.displayName).tag(InvestmentSourceType.snapTrade)
                     }
                 }
 
@@ -43,7 +51,7 @@ struct AddAccountSheet: View {
             }
             .padding([.horizontal, .bottom])
         }
-        .frame(width: 350, height: 230)
+        .frame(width: 350, height: 270)
         .sheet(isPresented: $showingBankConnection, onDismiss: {
             if let account = pendingAccount, account.trueLayerAccountId != nil {
                 // Connection succeeded -- insert the account
@@ -66,7 +74,7 @@ struct AddAccountSheet: View {
             pendingAccount = account
             showingBankConnection = true
         } else {
-            account.investmentSourceType = .csvFile
+            account.investmentSourceType = investmentSource
             modelContext.insert(account)
             onAccountCreated(account)
             dismiss()

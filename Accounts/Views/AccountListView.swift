@@ -10,6 +10,8 @@ struct AccountListView: View {
     @State private var showingAddAccount = false
     @State private var importingCSVAccount: Account?
     @State private var queuedCSVImportAccount: Account?
+    @State private var connectingSnapTradeAccount: Account?
+    @State private var queuedSnapTradeAccount: Account?
     @State private var showingSettings = false
     @State private var selectedAccount: Account?
     @State private var isRefreshing = false
@@ -90,17 +92,25 @@ struct AccountListView: View {
             if let account = queuedCSVImportAccount {
                 queuedCSVImportAccount = nil
                 importingCSVAccount = account
+            } else if let account = queuedSnapTradeAccount {
+                queuedSnapTradeAccount = nil
+                connectingSnapTradeAccount = account
             }
         }) {
             AddAccountSheet { account in
                 selectedAccount = account
-                if account.accountType == .investment {
+                if account.investmentSourceType == .csvFile {
                     queuedCSVImportAccount = account
+                } else if account.investmentSourceType == .snapTrade {
+                    queuedSnapTradeAccount = account
                 }
             }
         }
         .sheet(item: $importingCSVAccount) { account in
             CSVImportView(account: account)
+        }
+        .sheet(item: $connectingSnapTradeAccount) { account in
+            SnapTradeConnectionView(account: account)
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView()
@@ -113,7 +123,11 @@ struct AccountListView: View {
 
         // Refresh investment prices
         for account in accounts where account.accountType == .investment {
-            PortfolioImportService.refreshLinkedCSV(for: account)
+            if account.investmentSourceType == .csvFile {
+                PortfolioImportService.refreshLinkedCSV(for: account)
+            } else if account.investmentSourceType == .snapTrade {
+                try? await SnapTradeImportService.sync(account: account, refreshConnection: true)
+            }
         }
 
         let investmentHoldings = accounts

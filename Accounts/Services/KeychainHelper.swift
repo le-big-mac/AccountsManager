@@ -8,6 +8,10 @@ enum KeychainHelper {
         case trueLayerRefreshToken = "com.accounts.truelayer-refresh-token"
         case trueLayerAccessToken = "com.accounts.truelayer-access-token"
         case trueLayerTokenExpiry = "com.accounts.truelayer-token-expiry"
+        case snapTradeClientId = "com.accounts.snaptrade-client-id"
+        case snapTradeConsumerKey = "com.accounts.snaptrade-consumer-key"
+        case snapTradeUserId = "com.accounts.snaptrade-user-id"
+        case snapTradeUserSecret = "com.accounts.snaptrade-user-secret"
     }
 
     private static let storeURL: URL = {

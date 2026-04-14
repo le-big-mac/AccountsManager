@@ -23,14 +23,17 @@
 		7BD8B7EE624383E0B8DA54B5 /* CSVParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBFA496481DD2F96BCC491E5 /* CSVParserTests.swift */; };
 		7D467BCC0DCA83D8245F0550 /* BalanceEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 824F78886BED641EFC0DB017 /* BalanceEntry.swift */; };
 		7F31D169B5D378DCCBD8445A /* CashBalance.swift in Sources */ = {isa = PBXBuildFile; fileRef = D610509972D5F8363C4D732E /* CashBalance.swift */; };
+		810A22D3037A1929F467EAD9 /* SnapTradeConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E4C3670861904EF1E50DF18 /* SnapTradeConnectionView.swift */; };
 		8744C75380D3213885074E05 /* Account.swift in Sources */ = {isa = PBXBuildFile; fileRef = 316322C6E474FE63E874E3A5 /* Account.swift */; };
 		9069852949C792B157A6FD75 /* DecimalFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3585AD9ECBA052514E1E6205 /* DecimalFormatting.swift */; };
+		9917E9FAEDB1FA36D3C63336 /* SnapTradeImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70D3CFC25170798EF8B026D9 /* SnapTradeImportService.swift */; };
 		A76336E6080A0D0C29891373 /* AddAccountSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDA726D3D0B6854334B997BD /* AddAccountSheet.swift */; };
 		ACB170876047BA494F3AC735 /* CSVParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9076165EDF8F0D7287CC76F /* CSVParser.swift */; };
 		BAF586B34FEA24F77834E427 /* AccountsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 449443F0B28305AE02FD33AA /* AccountsApp.swift */; };
 		CA0C2151A0804865530C59D0 /* AccountListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73EE97A01ED4C0AFE54F35C0 /* AccountListView.swift */; };
 		E5CF52EFD6214993922473A8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF46D2736D4A4C46B235F631 /* SettingsView.swift */; };
 		E87879BDF44A293F8FBE57BA /* HoldingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F12746F64FCA0F94741647E /* HoldingsView.swift */; };
+		F1215986865D405E5E733723 /* SnapTradeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D73B845156C7C869C6FADC54 /* SnapTradeService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -48,11 +51,13 @@
 		316322C6E474FE63E874E3A5 /* Account.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Account.swift; sourceTree = "<group>"; };
 		3585AD9ECBA052514E1E6205 /* DecimalFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecimalFormatting.swift; sourceTree = "<group>"; };
 		3E05AB5C8443E8AAC371428F /* Accounts.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Accounts.entitlements; sourceTree = "<group>"; };
+		3E4C3670861904EF1E50DF18 /* SnapTradeConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapTradeConnectionView.swift; sourceTree = "<group>"; };
 		449443F0B28305AE02FD33AA /* AccountsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountsApp.swift; sourceTree = "<group>"; };
 		54A52C8C9CDD5723AD05A4AE /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
 		59D8951684C3D12EA0C3A4FD /* Platform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Platform.swift; sourceTree = "<group>"; };
 		6151884CF9CD014278317D6F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		6CB0E3AB5817532915F3DB73 /* AccountDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountDetailView.swift; sourceTree = "<group>"; };
+		70D3CFC25170798EF8B026D9 /* SnapTradeImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapTradeImportService.swift; sourceTree = "<group>"; };
 		721F5C8DF2944CA78DE0137B /* TrueLayerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrueLayerService.swift; sourceTree = "<group>"; };
 		73EE97A01ED4C0AFE54F35C0 /* AccountListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountListView.swift; sourceTree = "<group>"; };
 		78E5378A0655D4BE39226D4A /* BankConnectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BankConnectionView.swift; sourceTree = "<group>"; };
@@ -67,6 +72,7 @@
 		C97C23B5D4718B8F8A5CA9C8 /* Accounts.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Accounts.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D248520D07D44D19BCEBC9FE /* PortfolioImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortfolioImportService.swift; sourceTree = "<group>"; };
 		D610509972D5F8363C4D732E /* CashBalance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CashBalance.swift; sourceTree = "<group>"; };
+		D73B845156C7C869C6FADC54 /* SnapTradeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnapTradeService.swift; sourceTree = "<group>"; };
 		D9076165EDF8F0D7287CC76F /* CSVParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVParser.swift; sourceTree = "<group>"; };
 		DBFA496481DD2F96BCC491E5 /* CSVParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVParserTests.swift; sourceTree = "<group>"; };
 		DDA726D3D0B6854334B997BD /* AddAccountSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddAccountSheet.swift; sourceTree = "<group>"; };
@@ -86,6 +92,7 @@
 				9C42BAECA5AB65C13724445D /* CSVImportView.swift */,
 				9F12746F64FCA0F94741647E /* HoldingsView.swift */,
 				AF46D2736D4A4C46B235F631 /* SettingsView.swift */,
+				3E4C3670861904EF1E50DF18 /* SnapTradeConnectionView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -151,6 +158,8 @@
 				54A52C8C9CDD5723AD05A4AE /* KeychainHelper.swift */,
 				D248520D07D44D19BCEBC9FE /* PortfolioImportService.swift */,
 				A32EA035D80FAE34B5256B65 /* PriceService.swift */,
+				70D3CFC25170798EF8B026D9 /* SnapTradeImportService.swift */,
+				D73B845156C7C869C6FADC54 /* SnapTradeService.swift */,
 				721F5C8DF2944CA78DE0137B /* TrueLayerService.swift */,
 			);
 			path = Services;
@@ -283,6 +292,9 @@
 				795D2115C155AB3897C871FA /* PortfolioImportService.swift in Sources */,
 				4E908279458F56A60571ABFA /* PriceService.swift in Sources */,
 				E5CF52EFD6214993922473A8 /* SettingsView.swift in Sources */,
+				810A22D3037A1929F467EAD9 /* SnapTradeConnectionView.swift in Sources */,
+				9917E9FAEDB1FA36D3C63336 /* SnapTradeImportService.swift in Sources */,
+				F1215986865D405E5E733723 /* SnapTradeService.swift in Sources */,
 				3270FB92F34BEACF55968B7F /* TrueLayerService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

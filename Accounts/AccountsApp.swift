@@ -5,6 +5,7 @@ import SwiftData
 class AppState {
     static let shared = AppState()
     var trueLayerCallback: (code: String, state: String)?
+    var snapTradeCallbackReceived = false
 }
 
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -22,8 +23,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         DebugLog.write("URL callback received: \(urlString)")
 
         guard let url = URL(string: urlString),
-              url.scheme == "accounts",
-              url.host == "truelayer-callback",
+              url.scheme == "accounts" else {
+            DebugLog.write("URL callback parsing failed")
+            return
+        }
+
+        if url.host == "snaptrade-callback" {
+            DebugLog.write("SnapTrade callback received")
+            AppState.shared.snapTradeCallbackReceived = true
+            return
+        }
+
+        guard url.host == "truelayer-callback",
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let code = components.queryItems?.first(where: { $0.name == "code" })?.value,
               let state = components.queryItems?.first(where: { $0.name == "state" })?.value else {
