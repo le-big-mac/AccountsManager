@@ -7,6 +7,7 @@ final class Holding {
     var name: String
     var ticker: String?
     var isin: String?
+    var sedol: String?
     var units: Decimal
     var lastPrice: Decimal?
     var priceCurrencyRaw: String = ""
@@ -48,7 +49,7 @@ final class Holding {
     }
 
     var priceIdentifier: String? {
-        ticker ?? isin
+        ticker ?? isin ?? sedol
     }
 
     private var inferredPriceCurrency: String {
@@ -72,6 +73,7 @@ final class Holding {
         name: String,
         ticker: String? = nil,
         isin: String? = nil,
+        sedol: String? = nil,
         units: Decimal,
         priceCurrency: String = "GBP"
     ) {
@@ -79,6 +81,7 @@ final class Holding {
         self.name = name
         self.ticker = ticker
         self.isin = isin
+        self.sedol = sedol
         self.units = units
         self.priceCurrency = priceCurrency
     }

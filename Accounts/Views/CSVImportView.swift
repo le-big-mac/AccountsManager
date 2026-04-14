@@ -8,6 +8,7 @@ struct CSVImportView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var parsedCSV: CSVParser.ParsedCSV?
+    @State private var parsedURL: URL?
     @State private var error: String?
     @State private var isDragging = false
 
@@ -118,8 +119,14 @@ struct CSVImportView: View {
             HStack {
                 Spacer()
                 Button("Import") {
-                    importSnapshot(parsed)
-                    dismiss()
+                    if let parsedURL {
+                        do {
+                            _ = try PortfolioImportService.importCSV(at: parsedURL, into: account)
+                            dismiss()
+                        } catch {
+                            self.error = error.localizedDescription
+                        }
+                    }
                 }
                 .buttonStyle(.borderedProminent)
             }
@@ -152,51 +159,10 @@ struct CSVImportView: View {
         do {
             let parser = CSVParser()
             parsedCSV = try parser.parse(url: url)
+            parsedURL = url
             error = nil
         } catch {
             self.error = error.localizedDescription
-        }
-    }
-
-    private func importSnapshot(_ parsed: CSVParser.ParsedCSV) {
-        importHoldings(parsed.holdings)
-        importCashBalances(parsed.cashBalances)
-    }
-
-    private func importHoldings(_ holdings: [ParsedHolding]) {
-        for h in holdings {
-            if let existing = account.holdings.first(where: {
-                ($0.ticker != nil && $0.ticker == h.ticker) || $0.name == h.name
-            }) {
-                existing.units = h.units
-                existing.priceCurrency = h.priceCurrency
-            } else {
-                let holding = Holding(
-                    name: h.name,
-                    ticker: h.ticker,
-                    isin: h.isin,
-                    units: h.units,
-                    priceCurrency: h.priceCurrency
-                )
-                account.holdings.append(holding)
-            }
-        }
-    }
-
-    private func importCashBalances(_ cashBalances: [ParsedCashBalance]) {
-        for cash in cashBalances {
-            if let existing = account.cashBalances.first(where: {
-                $0.currency == cash.currency && $0.name == cash.name
-            }) {
-                existing.amount = cash.amount
-                existing.updatedAt = Date()
-            } else {
-                account.cashBalances.append(CashBalance(
-                    name: cash.name,
-                    amount: cash.amount,
-                    currency: cash.currency
-                ))
-            }
         }
     }
 }

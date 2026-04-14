@@ -1,6 +1,11 @@
 import Foundation
 import SwiftData
 
+enum InvestmentSourceType: String {
+    case csvFile
+    case snapTrade
+}
+
 @Model
 final class Account {
     var id: UUID
@@ -9,6 +14,10 @@ final class Account {
     var trueLayerAccountId: String?    // comma-separated for multiple accounts
     var trueLayerRefreshToken: String?  // per-account refresh token
     var trueLayerProvider: String?     // provider_id when available, otherwise display name -- used to filter
+    var investmentSourceTypeRaw: String?
+    var csvSourcePath: String?
+    var csvSourceFormatRaw: String?
+    var csvSourceImportedAt: Date?
     var sortOrder: Int
     var isArchived: Bool
     var createdAt: Date
@@ -25,6 +34,11 @@ final class Account {
     var accountType: AccountType {
         get { AccountType(rawValue: accountTypeRaw) ?? .investment }
         set { accountTypeRaw = newValue.rawValue }
+    }
+
+    var investmentSourceType: InvestmentSourceType? {
+        get { investmentSourceTypeRaw.flatMap(InvestmentSourceType.init(rawValue:)) }
+        set { investmentSourceTypeRaw = newValue?.rawValue }
     }
 
     var currentBalance: Decimal {

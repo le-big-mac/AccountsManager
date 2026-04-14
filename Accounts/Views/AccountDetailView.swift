@@ -34,6 +34,12 @@ struct AccountDetailView: View {
                     HoldingsView(account: account)
 
                     HStack {
+                        if let csvSourcePath = account.csvSourcePath {
+                            Label(URL(fileURLWithPath: csvSourcePath).lastPathComponent, systemImage: "link")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
                         Button {
                             showingCSVImport = true
                         } label: {
@@ -120,6 +126,7 @@ struct AccountDetailView: View {
     private func refreshPrices() async {
         isRefreshing = true
         defer { isRefreshing = false }
+        PortfolioImportService.refreshLinkedCSV(for: account)
         await PriceService.shared.refreshHoldings(account.holdings)
         await PriceService.shared.refreshCashBalances(account.cashBalances)
     }

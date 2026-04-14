@@ -1,6 +1,6 @@
 import Foundation
 
-enum CSVPlatformFormat {
+enum CSVPlatformFormat: String {
     case genericPortfolio
     case vanguardUK
     case robinhood

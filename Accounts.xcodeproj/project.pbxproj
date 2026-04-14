@@ -19,6 +19,7 @@
 		56F1E5C986024661AA0F50CF /* Holding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 813ADC10F92BA2924E3E9E3E /* Holding.swift */; };
 		675AE5AA474445299F7EC58E /* CSVImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C42BAECA5AB65C13724445D /* CSVImportView.swift */; };
 		77C8D2D1D9BD41E0AD24FD1E /* BankConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E5378A0655D4BE39226D4A /* BankConnectionView.swift */; };
+		795D2115C155AB3897C871FA /* PortfolioImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D248520D07D44D19BCEBC9FE /* PortfolioImportService.swift */; };
 		7BD8B7EE624383E0B8DA54B5 /* CSVParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBFA496481DD2F96BCC491E5 /* CSVParserTests.swift */; };
 		7D467BCC0DCA83D8245F0550 /* BalanceEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 824F78886BED641EFC0DB017 /* BalanceEntry.swift */; };
 		7F31D169B5D378DCCBD8445A /* CashBalance.swift in Sources */ = {isa = PBXBuildFile; fileRef = D610509972D5F8363C4D732E /* CashBalance.swift */; };
@@ -64,6 +65,7 @@
 		B21077A481D080A9254D3F61 /* DebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
 		BAE1031E3C742DAD04630FB7 /* AccountRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountRow.swift; sourceTree = "<group>"; };
 		C97C23B5D4718B8F8A5CA9C8 /* Accounts.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Accounts.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D248520D07D44D19BCEBC9FE /* PortfolioImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortfolioImportService.swift; sourceTree = "<group>"; };
 		D610509972D5F8363C4D732E /* CashBalance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CashBalance.swift; sourceTree = "<group>"; };
 		D9076165EDF8F0D7287CC76F /* CSVParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVParser.swift; sourceTree = "<group>"; };
 		DBFA496481DD2F96BCC491E5 /* CSVParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVParserTests.swift; sourceTree = "<group>"; };
@@ -147,6 +149,7 @@
 			children = (
 				D9076165EDF8F0D7287CC76F /* CSVParser.swift */,
 				54A52C8C9CDD5723AD05A4AE /* KeychainHelper.swift */,
+				D248520D07D44D19BCEBC9FE /* PortfolioImportService.swift */,
 				A32EA035D80FAE34B5256B65 /* PriceService.swift */,
 				721F5C8DF2944CA78DE0137B /* TrueLayerService.swift */,
 			);
@@ -277,6 +280,7 @@
 				E87879BDF44A293F8FBE57BA /* HoldingsView.swift in Sources */,
 				2CCA26B6E0EC34C8000CCBD0 /* KeychainHelper.swift in Sources */,
 				093E67DD87F9E2D414875C68 /* Platform.swift in Sources */,
+				795D2115C155AB3897C871FA /* PortfolioImportService.swift in Sources */,
 				4E908279458F56A60571ABFA /* PriceService.swift in Sources */,
 				E5CF52EFD6214993922473A8 /* SettingsView.swift in Sources */,
 				3270FB92F34BEACF55968B7F /* TrueLayerService.swift in Sources */,

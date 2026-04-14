@@ -98,6 +98,10 @@ struct AccountListView: View {
         defer { isRefreshing = false }
 
         // Refresh investment prices
+        for account in accounts where account.accountType == .investment {
+            PortfolioImportService.refreshLinkedCSV(for: account)
+        }
+
         let investmentHoldings = accounts
             .filter { $0.accountType == .investment }
             .flatMap { $0.holdings }
