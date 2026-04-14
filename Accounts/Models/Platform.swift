@@ -16,7 +16,7 @@ enum AccountType: String, Codable, CaseIterable, Identifiable {
     var description: String {
         switch self {
         case .bankAccount: "Auto-syncs balance via Open Banking (TrueLayer)"
-        case .investment: "Track holdings with live prices (CSV import or manual)"
+        case .investment: "Track holdings with live prices (CSV import or SnapTrade)"
         }
     }
 

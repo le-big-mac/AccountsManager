@@ -30,6 +30,14 @@ extension Decimal {
         }
         return formatter.string(from: self as NSDecimalNumber) ?? "£0.00"
     }
+
+    func formattedPercent() -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .percent
+        formatter.maximumFractionDigits = 1
+        formatter.minimumFractionDigits = 1
+        return formatter.string(from: self as NSDecimalNumber) ?? "0.0%"
+    }
 }
 
 extension Date {

@@ -31,6 +31,7 @@
 		A76336E6080A0D0C29891373 /* AddAccountSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDA726D3D0B6854334B997BD /* AddAccountSheet.swift */; };
 		ACB170876047BA494F3AC735 /* CSVParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9076165EDF8F0D7287CC76F /* CSVParser.swift */; };
 		BAF586B34FEA24F77834E427 /* AccountsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 449443F0B28305AE02FD33AA /* AccountsApp.swift */; };
+		C2C3F2A4F24ECE21A4BB32EB /* CombinedAccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14DE8542C338C85A5E54D454 /* CombinedAccountsView.swift */; };
 		CA0C2151A0804865530C59D0 /* AccountListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73EE97A01ED4C0AFE54F35C0 /* AccountListView.swift */; };
 		E5CF52EFD6214993922473A8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF46D2736D4A4C46B235F631 /* SettingsView.swift */; };
 		E87879BDF44A293F8FBE57BA /* HoldingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F12746F64FCA0F94741647E /* HoldingsView.swift */; };
@@ -49,6 +50,7 @@
 
 /* Begin PBXFileReference section */
 		0CFA8BB7B20E44EE99B0C959 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
+		14DE8542C338C85A5E54D454 /* CombinedAccountsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CombinedAccountsView.swift; sourceTree = "<group>"; };
 		316322C6E474FE63E874E3A5 /* Account.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Account.swift; sourceTree = "<group>"; };
 		3585AD9ECBA052514E1E6205 /* DecimalFormatting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DecimalFormatting.swift; sourceTree = "<group>"; };
 		3E05AB5C8443E8AAC371428F /* Accounts.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Accounts.entitlements; sourceTree = "<group>"; };
@@ -91,6 +93,7 @@
 				BAE1031E3C742DAD04630FB7 /* AccountRow.swift */,
 				DDA726D3D0B6854334B997BD /* AddAccountSheet.swift */,
 				78E5378A0655D4BE39226D4A /* BankConnectionView.swift */,
+				14DE8542C338C85A5E54D454 /* CombinedAccountsView.swift */,
 				9C42BAECA5AB65C13724445D /* CSVImportView.swift */,
 				9F12746F64FCA0F94741647E /* HoldingsView.swift */,
 				AF46D2736D4A4C46B235F631 /* SettingsView.swift */,
@@ -286,6 +289,7 @@
 				675AE5AA474445299F7EC58E /* CSVImportView.swift in Sources */,
 				ACB170876047BA494F3AC735 /* CSVParser.swift in Sources */,
 				7F31D169B5D378DCCBD8445A /* CashBalance.swift in Sources */,
+				C2C3F2A4F24ECE21A4BB32EB /* CombinedAccountsView.swift in Sources */,
 				09FD838D8FB2C21092F323C1 /* DebugLog.swift in Sources */,
 				9069852949C792B157A6FD75 /* DecimalFormatting.swift in Sources */,
 				56F1E5C986024661AA0F50CF /* Holding.swift in Sources */,

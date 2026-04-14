@@ -5,6 +5,7 @@ struct HoldingsView: View {
     @Bindable var account: Account
     @Environment(\.modelContext) private var modelContext
     @State private var showingAddHolding = false
+    @State private var sortMode: HoldingSortMode = .name
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -12,6 +13,13 @@ struct HoldingsView: View {
                 Text("Holdings")
                     .font(.headline)
                 Spacer()
+                Picker("Sort", selection: $sortMode) {
+                    ForEach(HoldingSortMode.allCases) { mode in
+                        Text(mode.displayName).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 180)
                 Button {
                     showingAddHolding = true
                 } label: {
@@ -41,7 +49,7 @@ struct HoldingsView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
-                ForEach(account.holdings) { holding in
+                ForEach(sortedHoldings) { holding in
                     HoldingRow(holding: holding)
                     Divider()
                 }
@@ -49,6 +57,36 @@ struct HoldingsView: View {
         }
         .sheet(isPresented: $showingAddHolding) {
             AddHoldingSheet(account: account)
+        }
+    }
+
+    private var sortedHoldings: [Holding] {
+        switch sortMode {
+        case .name:
+            return account.holdings.sorted {
+                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+        case .value:
+            return account.holdings.sorted {
+                if $0.currentValueGBP == $1.currentValueGBP {
+                    return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                }
+                return $0.currentValueGBP > $1.currentValueGBP
+            }
+        }
+    }
+}
+
+enum HoldingSortMode: String, CaseIterable, Identifiable {
+    case name
+    case value
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .name: "A-Z"
+        case .value: "Value"
         }
     }
 }
@@ -139,8 +177,10 @@ struct AddHoldingSheet: View {
     @State private var isin = ""
     @State private var unitsText = ""
     @State private var priceCurrency = "GBP"
+    @State private var assetClass: HoldingAssetClass = .stock
 
     private let supportedCurrencies = ["GBP", "USD"]
+    private let supportedAssetClasses = HoldingAssetClass.allCases.filter { $0 != .cash }
 
     var body: some View {
         Form {
@@ -153,9 +193,14 @@ struct AddHoldingSheet: View {
                     Text(currency).tag(currency)
                 }
             }
+            Picker("Asset Class", selection: $assetClass) {
+                ForEach(supportedAssetClasses) { assetClass in
+                    Text(assetClass.displayName).tag(assetClass)
+                }
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 400, height: 260)
+        .frame(width: 400, height: 300)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -168,7 +213,8 @@ struct AddHoldingSheet: View {
                         ticker: ticker.isEmpty ? nil : ticker,
                         isin: isin.isEmpty ? nil : isin,
                         units: units,
-                        priceCurrency: priceCurrency
+                        priceCurrency: priceCurrency,
+                        assetClass: assetClass
                     )
                     account.holdings.append(holding)
                     dismiss()

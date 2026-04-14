@@ -24,6 +24,27 @@ struct AccountListView: View {
     var body: some View {
         NavigationSplitView {
             VStack(spacing: 0) {
+                Button {
+                    selectedAccount = nil
+                } label: {
+                    HStack {
+                        Image(systemName: "chart.pie.fill")
+                            .foregroundStyle(.blue)
+                        Text("Overview")
+                        Spacer()
+                        Text(grandTotal.formattedGBP())
+                            .font(.system(.caption, design: .rounded, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(selectedAccount == nil ? Color.accentColor.opacity(0.14) : Color.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 8)
+                .padding(.top, 8)
+
                 List(accounts, selection: $selectedAccount) { account in
                     AccountRow(account: account)
                         .tag(account)
@@ -79,11 +100,7 @@ struct AccountListView: View {
             if let account = selectedAccount {
                 AccountDetailView(account: account)
             } else {
-                ContentUnavailableView(
-                    "Select an Account",
-                    systemImage: "chart.bar.fill",
-                    description: Text("Choose an account from the sidebar to view details")
-                )
+                CombinedAccountsView(accounts: accounts)
             }
         }
         .sheet(isPresented: $showingAddAccount, onDismiss: {
@@ -150,7 +167,7 @@ struct AccountListView: View {
         }
 
         let investmentHoldings = accounts
-            .filter { $0.accountType == .investment }
+            .filter { $0.accountType == .investment && $0.investmentSourceType == .csvFile }
             .flatMap { $0.holdings }
         let investmentCash = accounts
             .filter { $0.accountType == .investment }

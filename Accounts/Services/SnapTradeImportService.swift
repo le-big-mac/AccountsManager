@@ -42,7 +42,8 @@ enum SnapTradeImportService {
                 isin: nil,
                 sedol: nil,
                 units: abs(units),
-                priceCurrency: currency
+                priceCurrency: currency,
+                assetClass: HoldingAssetClass.from(name) ?? .stock
             )
         }
 
@@ -86,7 +87,8 @@ enum SnapTradeImportService {
                         isin: $0.isin,
                         sedol: $0.sedol,
                         units: $0.units,
-                        priceCurrency: $0.priceCurrency
+                        priceCurrency: $0.priceCurrency,
+                        assetClass: $0.assetClass
                     )
                 },
                 cashBalances: cashBalances

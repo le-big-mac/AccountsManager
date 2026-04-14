@@ -25,6 +25,7 @@ struct ParsedHolding {
     let sedol: String?
     let units: Decimal
     let priceCurrency: String
+    let assetClass: HoldingAssetClass?
 }
 
 struct ParsedCashBalance {
@@ -93,7 +94,7 @@ struct CSVParser {
         let joined = headers.joined(separator: " ").lowercased()
         let normalized = headers.map(normalizedHeader)
 
-        if normalized.contains("type") &&
+        if normalized.contains("assetclass") &&
             normalized.contains("units") &&
             normalized.contains("currency") {
             return .genericPortfolio
@@ -148,14 +149,14 @@ struct CSVParser {
             return []
         }
 
-        let typeIdx = index["type"]
+        guard let assetClassIdx = index["assetclass"] else { return [] }
         let tickerIdx = index["ticker"]
         let isinIdx = index["isin"]
         let sedolIdx = index["sedol"]
 
         return rows.compactMap { row in
-            let type = value(row, at: typeIdx)?.lowercased() ?? "security"
-            guard type.isEmpty || type == "security" || type == "holding" else { return nil }
+            let assetClass = HoldingAssetClass.from(value(row, at: assetClassIdx))
+            guard let assetClass, assetClass != .cash else { return nil }
             guard let name = value(row, at: nameIdx), !name.isEmpty,
                   let unitsText = value(row, at: unitsIdx),
                   let units = parseDecimal(unitsText),
@@ -167,23 +168,25 @@ struct CSVParser {
                 isin: value(row, at: isinIdx).flatMap(nonEmpty),
                 sedol: value(row, at: sedolIdx).flatMap(nonEmpty),
                 units: abs(units),
-                priceCurrency: value(row, at: currencyIdx).flatMap(nonEmpty) ?? "GBP"
+                priceCurrency: value(row, at: currencyIdx).flatMap(nonEmpty) ?? "GBP",
+                assetClass: assetClass
             )
         }
     }
 
     private func extractGenericCashBalances(headers: [String], rows: [[String]]) -> [ParsedCashBalance] {
         let index = headerIndex(headers)
-        guard let typeIdx = index["type"],
-              let currencyIdx = index["currency"] else {
+        guard let currencyIdx = index["currency"] else {
             return []
         }
 
+        guard let assetClassIdx = index["assetclass"] else { return [] }
         let nameIdx = index["name"]
         guard let amountIdx = index["units"] else { return [] }
 
         return rows.compactMap { row in
-            guard value(row, at: typeIdx)?.lowercased() == "cash",
+            let assetClass = HoldingAssetClass.from(value(row, at: assetClassIdx))
+            guard assetClass == .cash,
                   let amountText = value(row, at: amountIdx),
                   let amount = parseDecimal(amountText) else { return nil }
 
@@ -214,7 +217,7 @@ struct CSVParser {
         }
 
         return holdingMap.map { name, units in
-            ParsedHolding(name: name, ticker: nil, isin: nil, sedol: nil, units: abs(units), priceCurrency: "GBP")
+            ParsedHolding(name: name, ticker: nil, isin: nil, sedol: nil, units: abs(units), priceCurrency: "GBP", assetClass: .fund)
         }
     }
 
@@ -243,7 +246,7 @@ struct CSVParser {
         }
 
         return holdingMap.map { key, value in
-            ParsedHolding(name: value.name, ticker: key, isin: nil, sedol: nil, units: abs(value.units), priceCurrency: "USD")
+            ParsedHolding(name: value.name, ticker: key, isin: nil, sedol: nil, units: abs(value.units), priceCurrency: "USD", assetClass: .stock)
         }.filter { $0.units > 0 }
     }
 
@@ -271,7 +274,7 @@ struct CSVParser {
         }
 
         return holdingMap.map { _, value in
-            ParsedHolding(name: value.name, ticker: nil, isin: nil, sedol: value.sedol, units: abs(value.units), priceCurrency: "GBP")
+            ParsedHolding(name: value.name, ticker: nil, isin: nil, sedol: value.sedol, units: abs(value.units), priceCurrency: "GBP", assetClass: HoldingAssetClass.from(value.name))
         }.filter { $0.units > 0 }
     }
 

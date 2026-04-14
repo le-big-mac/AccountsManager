@@ -1,6 +1,47 @@
 import Foundation
 import SwiftData
 
+enum HoldingAssetClass: String, CaseIterable, Identifiable {
+    case cash
+    case stock
+    case etf
+    case fund
+    case other
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .cash: "Cash"
+        case .stock: "Securities"
+        case .etf: "ETFs"
+        case .fund: "Funds"
+        case .other: "Other"
+        }
+    }
+
+    static func from(_ value: String?) -> HoldingAssetClass? {
+        guard let value else { return nil }
+        let normalized = value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .filter { $0.isLetter || $0.isNumber }
+
+        switch normalized {
+        case "cash":
+            return .cash
+        case "stock", "stocks", "share", "shares", "equity", "equities", "security", "securities":
+            return .stock
+        case "etf", "etfs", "exchangetradedfund":
+            return .etf
+        case "fund", "funds", "mutualfund", "oeic", "unittrust":
+            return .fund
+        default:
+            return nil
+        }
+    }
+}
+
 @Model
 final class Holding {
     var id: UUID
@@ -11,6 +52,7 @@ final class Holding {
     var units: Decimal
     var lastPrice: Decimal?
     var priceCurrencyRaw: String = ""
+    var assetClassRaw: String?
     var fxRateToGBP: Decimal?
     var fxRateDate: Date?
     var lastPriceDate: Date?
@@ -37,6 +79,11 @@ final class Holding {
         set { priceCurrencyRaw = normalizedCurrency(newValue) }
     }
 
+    var assetClass: HoldingAssetClass {
+        get { HoldingAssetClass(rawValue: assetClassRaw ?? "") ?? inferredAssetClass }
+        set { assetClassRaw = newValue.rawValue }
+    }
+
     var effectiveFXRateToGBP: Decimal {
         switch priceCurrency {
         case "GBP":
@@ -61,6 +108,33 @@ final class Holding {
         return "USD"
     }
 
+    private var inferredAssetClass: HoldingAssetClass {
+        let text = [name, ticker, isin, sedol]
+            .compactMap { $0 }
+            .joined(separator: " ")
+            .lowercased()
+
+        if text.contains(" etf")
+            || text.contains(" ucits")
+            || text.contains("ishares")
+            || text.contains("vanguard ftse")
+            || text.contains("vanguard s&p")
+            || text.contains("vanguard sp") {
+            return .etf
+        }
+
+        if text.contains("fund")
+            || text.contains("oeic")
+            || text.contains("index")
+            || text.contains("accumulation")
+            || text.contains("income")
+            || text.contains("acc ") {
+            return .fund
+        }
+
+        return .stock
+    }
+
     private func normalizedCurrency(_ currency: String) -> String {
         let trimmed = currency.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed == "GBp" || trimmed == "GBX" {
@@ -75,7 +149,8 @@ final class Holding {
         isin: String? = nil,
         sedol: String? = nil,
         units: Decimal,
-        priceCurrency: String = "GBP"
+        priceCurrency: String = "GBP",
+        assetClass: HoldingAssetClass? = nil
     ) {
         self.id = UUID()
         self.name = name
@@ -84,5 +159,6 @@ final class Holding {
         self.sedol = sedol
         self.units = units
         self.priceCurrency = priceCurrency
+        self.assetClassRaw = assetClass?.rawValue
     }
 }

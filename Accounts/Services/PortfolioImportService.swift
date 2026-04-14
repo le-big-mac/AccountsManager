@@ -42,6 +42,9 @@ enum PortfolioImportService {
                 existing.sedol = h.sedol
                 existing.units = h.units
                 existing.priceCurrency = h.priceCurrency
+                if let assetClass = h.assetClass {
+                    existing.assetClass = assetClass
+                }
             } else {
                 let holding = Holding(
                     name: h.name,
@@ -49,7 +52,8 @@ enum PortfolioImportService {
                     isin: h.isin,
                     sedol: h.sedol,
                     units: h.units,
-                    priceCurrency: h.priceCurrency
+                    priceCurrency: h.priceCurrency,
+                    assetClass: h.assetClass
                 )
                 account.holdings.append(holding)
             }
