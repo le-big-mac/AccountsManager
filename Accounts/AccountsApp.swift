@@ -49,11 +49,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct AccountsApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    private let modelContainer: ModelContainer
+
+    init() {
+        PersistentStoreBackup.backupDefaultStore()
+
+        do {
+            modelContainer = try ModelContainer(for: Account.self)
+        } catch {
+            DebugLog.write("SwiftData model container failed: \(error.localizedDescription)")
+            fatalError("SwiftData model container failed: \(error)")
+        }
+    }
 
     var body: some Scene {
         WindowGroup {
             AccountListView()
-                .modelContainer(for: Account.self)
+                .modelContainer(modelContainer)
                 .environment(AppState.shared)
         }
         .defaultSize(width: 750, height: 500)

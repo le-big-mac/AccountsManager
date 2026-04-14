@@ -14,6 +14,7 @@ struct AccountListView: View {
     @State private var queuedSnapTradeAccount: Account?
     @State private var showingSettings = false
     @State private var selectedAccount: Account?
+    @State private var accountPendingDeletion: Account?
     @State private var isRefreshing = false
 
     private var grandTotal: Decimal {
@@ -31,10 +32,7 @@ struct AccountListView: View {
                                 account.isArchived = true
                             }
                             Button("Delete", role: .destructive) {
-                                if selectedAccount == account {
-                                    selectedAccount = nil
-                                }
-                                modelContext.delete(account)
+                                accountPendingDeletion = account
                             }
                         }
                 }
@@ -114,6 +112,27 @@ struct AccountListView: View {
         }
         .sheet(isPresented: $showingSettings) {
             SettingsView()
+        }
+        .alert(
+            "Delete Account?",
+            isPresented: Binding(
+                get: { accountPendingDeletion != nil },
+                set: { if !$0 { accountPendingDeletion = nil } }
+            ),
+            presenting: accountPendingDeletion
+        ) { account in
+            Button("Delete", role: .destructive) {
+                if selectedAccount == account {
+                    selectedAccount = nil
+                }
+                modelContext.delete(account)
+                accountPendingDeletion = nil
+            }
+            Button("Cancel", role: .cancel) {
+                accountPendingDeletion = nil
+            }
+        } message: { account in
+            Text("This removes \(account.name), including holdings, balances, and connection tokens.")
         }
     }
 
