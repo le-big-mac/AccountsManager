@@ -62,9 +62,14 @@ struct HoldingRow: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if let price = holding.lastPrice {
-                        Text("@ \(price.formattedGBP())")
+                        Text("@ \(price.formattedCurrency(code: holding.priceCurrency))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        if holding.priceCurrency != "GBP", holding.effectiveFXRateToGBP > 0 {
+                            Text("FX \(holding.effectiveFXRateToGBP as NSDecimalNumber)")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 }
             }
@@ -72,8 +77,15 @@ struct HoldingRow: View {
             Spacer()
 
             if holding.lastPrice != nil {
-                Text(holding.currentValue.formattedGBP())
-                    .font(.system(.body, design: .rounded, weight: .semibold))
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(holding.currentValueGBP.formattedGBP())
+                        .font(.system(.body, design: .rounded, weight: .semibold))
+                    if holding.priceCurrency != "GBP" {
+                        Text(holding.localCurrentValue.formattedCurrency(code: holding.priceCurrency))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             } else {
                 Text("--")
                     .foregroundStyle(.secondary)
@@ -92,6 +104,9 @@ struct AddHoldingSheet: View {
     @State private var ticker = ""
     @State private var isin = ""
     @State private var unitsText = ""
+    @State private var priceCurrency = "GBP"
+
+    private let supportedCurrencies = ["GBP", "USD"]
 
     var body: some View {
         Form {
@@ -99,9 +114,14 @@ struct AddHoldingSheet: View {
             TextField("Ticker (e.g. VWRL.L or AAPL)", text: $ticker)
             TextField("ISIN (optional, e.g. GB00BD3RZ582)", text: $isin)
             TextField("Units / Shares", text: $unitsText)
+            Picker("Price Currency", selection: $priceCurrency) {
+                ForEach(supportedCurrencies, id: \.self) { currency in
+                    Text(currency).tag(currency)
+                }
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 400, height: 220)
+        .frame(width: 400, height: 260)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -113,7 +133,8 @@ struct AddHoldingSheet: View {
                         name: name,
                         ticker: ticker.isEmpty ? nil : ticker,
                         isin: isin.isEmpty ? nil : isin,
-                        units: units
+                        units: units,
+                        priceCurrency: priceCurrency
                     )
                     account.holdings.append(holding)
                     dismiss()

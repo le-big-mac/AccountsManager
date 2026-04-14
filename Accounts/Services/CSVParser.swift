@@ -21,6 +21,7 @@ struct ParsedHolding {
     let ticker: String?
     let isin: String?
     let units: Decimal
+    let priceCurrency: String
 }
 
 struct CSVParser {
@@ -123,7 +124,7 @@ struct CSVParser {
         }
 
         return holdingMap.map { name, units in
-            ParsedHolding(name: name, ticker: nil, isin: nil, units: abs(units))
+            ParsedHolding(name: name, ticker: nil, isin: nil, units: abs(units), priceCurrency: "GBP")
         }
     }
 
@@ -152,7 +153,7 @@ struct CSVParser {
         }
 
         return holdingMap.map { key, value in
-            ParsedHolding(name: value.name, ticker: key, isin: nil, units: abs(value.units))
+            ParsedHolding(name: value.name, ticker: key, isin: nil, units: abs(value.units), priceCurrency: "USD")
         }.filter { $0.units > 0 }
     }
 
@@ -180,7 +181,7 @@ struct CSVParser {
         }
 
         return holdingMap.map { _, value in
-            ParsedHolding(name: value.name, ticker: nil, isin: nil, units: abs(value.units))
+            ParsedHolding(name: value.name, ticker: nil, isin: nil, units: abs(value.units), priceCurrency: "GBP")
         }.filter { $0.units > 0 }
     }
 }

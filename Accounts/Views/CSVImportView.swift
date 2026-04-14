@@ -85,7 +85,7 @@ struct CSVImportView: View {
                                 Text(h.name)
                                     .font(.subheadline)
                                 if let ticker = h.ticker {
-                                    Text(ticker)
+                                    Text("\(ticker) · \(h.priceCurrency)")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
@@ -148,12 +148,14 @@ struct CSVImportView: View {
                 ($0.ticker != nil && $0.ticker == h.ticker) || $0.name == h.name
             }) {
                 existing.units = h.units
+                existing.priceCurrency = h.priceCurrency
             } else {
                 let holding = Holding(
                     name: h.name,
                     ticker: h.ticker,
                     isin: h.isin,
-                    units: h.units
+                    units: h.units,
+                    priceCurrency: h.priceCurrency
                 )
                 account.holdings.append(holding)
             }

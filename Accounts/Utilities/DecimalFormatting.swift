@@ -1,14 +1,18 @@
 import Foundation
 
 extension Decimal {
-    func formattedGBP() -> String {
+    func formattedCurrency(code: String, locale: Locale = Locale(identifier: "en_GB")) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
-        formatter.currencyCode = "GBP"
-        formatter.locale = Locale(identifier: "en_GB")
+        formatter.currencyCode = code.uppercased()
+        formatter.locale = locale
         formatter.maximumFractionDigits = 2
         formatter.minimumFractionDigits = 2
-        return formatter.string(from: self as NSDecimalNumber) ?? "£0.00"
+        return formatter.string(from: self as NSDecimalNumber) ?? "\(code.uppercased()) \(self)"
+    }
+
+    func formattedGBP() -> String {
+        formattedCurrency(code: "GBP")
     }
 
     func formattedCompact() -> String {
