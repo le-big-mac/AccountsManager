@@ -21,6 +21,7 @@
 		77C8D2D1D9BD41E0AD24FD1E /* BankConnectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78E5378A0655D4BE39226D4A /* BankConnectionView.swift */; };
 		7BD8B7EE624383E0B8DA54B5 /* CSVParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBFA496481DD2F96BCC491E5 /* CSVParserTests.swift */; };
 		7D467BCC0DCA83D8245F0550 /* BalanceEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 824F78886BED641EFC0DB017 /* BalanceEntry.swift */; };
+		7F31D169B5D378DCCBD8445A /* CashBalance.swift in Sources */ = {isa = PBXBuildFile; fileRef = D610509972D5F8363C4D732E /* CashBalance.swift */; };
 		8744C75380D3213885074E05 /* Account.swift in Sources */ = {isa = PBXBuildFile; fileRef = 316322C6E474FE63E874E3A5 /* Account.swift */; };
 		9069852949C792B157A6FD75 /* DecimalFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3585AD9ECBA052514E1E6205 /* DecimalFormatting.swift */; };
 		A76336E6080A0D0C29891373 /* AddAccountSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDA726D3D0B6854334B997BD /* AddAccountSheet.swift */; };
@@ -63,6 +64,7 @@
 		B21077A481D080A9254D3F61 /* DebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
 		BAE1031E3C742DAD04630FB7 /* AccountRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountRow.swift; sourceTree = "<group>"; };
 		C97C23B5D4718B8F8A5CA9C8 /* Accounts.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Accounts.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D610509972D5F8363C4D732E /* CashBalance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CashBalance.swift; sourceTree = "<group>"; };
 		D9076165EDF8F0D7287CC76F /* CSVParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVParser.swift; sourceTree = "<group>"; };
 		DBFA496481DD2F96BCC491E5 /* CSVParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CSVParserTests.swift; sourceTree = "<group>"; };
 		DDA726D3D0B6854334B997BD /* AddAccountSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddAccountSheet.swift; sourceTree = "<group>"; };
@@ -124,6 +126,7 @@
 			children = (
 				316322C6E474FE63E874E3A5 /* Account.swift */,
 				824F78886BED641EFC0DB017 /* BalanceEntry.swift */,
+				D610509972D5F8363C4D732E /* CashBalance.swift */,
 				813ADC10F92BA2924E3E9E3E /* Holding.swift */,
 				59D8951684C3D12EA0C3A4FD /* Platform.swift */,
 			);
@@ -267,6 +270,7 @@
 				77C8D2D1D9BD41E0AD24FD1E /* BankConnectionView.swift in Sources */,
 				675AE5AA474445299F7EC58E /* CSVImportView.swift in Sources */,
 				ACB170876047BA494F3AC735 /* CSVParser.swift in Sources */,
+				7F31D169B5D378DCCBD8445A /* CashBalance.swift in Sources */,
 				09FD838D8FB2C21092F323C1 /* DebugLog.swift in Sources */,
 				9069852949C792B157A6FD75 /* DecimalFormatting.swift in Sources */,
 				56F1E5C986024661AA0F50CF /* Holding.swift in Sources */,

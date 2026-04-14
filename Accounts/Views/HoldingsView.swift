@@ -20,12 +20,27 @@ struct HoldingsView: View {
                 .buttonStyle(.borderless)
             }
 
-            if account.holdings.isEmpty {
+            if account.holdings.isEmpty && account.cashBalances.isEmpty {
                 Text("No holdings yet. Import a CSV or add manually.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 8)
             } else {
+                if !account.cashBalances.isEmpty {
+                    Text("Cash")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    ForEach(account.cashBalances) { cash in
+                        CashBalanceRow(cash: cash)
+                        Divider()
+                    }
+                }
+
+                if !account.holdings.isEmpty {
+                    Text("Securities")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
                 ForEach(account.holdings) { holding in
                     HoldingRow(holding: holding)
                     Divider()
@@ -35,6 +50,35 @@ struct HoldingsView: View {
         .sheet(isPresented: $showingAddHolding) {
             AddHoldingSheet(account: account)
         }
+    }
+}
+
+struct CashBalanceRow: View {
+    let cash: CashBalance
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(cash.name)
+                    .font(.subheadline)
+                HStack(spacing: 4) {
+                    Text(cash.amount.formattedCurrency(code: cash.currency))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if cash.currency != "GBP", cash.effectiveFXRateToGBP > 0 {
+                        Text("FX \(cash.effectiveFXRateToGBP as NSDecimalNumber)")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+            }
+
+            Spacer()
+
+            Text(cash.amountGBP.formattedGBP())
+                .font(.system(.body, design: .rounded, weight: .semibold))
+        }
+        .padding(.vertical, 2)
     }
 }
 
