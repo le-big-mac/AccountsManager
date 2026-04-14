@@ -117,12 +117,12 @@ final class SnapTradeService {
 
         let timestamp = String(Int(Date().timeIntervalSince1970.rounded()))
         var allQueryItems = [
-            URLQueryItem(name: "clientId", value: credentials.clientId),
-            URLQueryItem(name: "timestamp", value: timestamp)
+            URLQueryItem(name: "clientId", value: credentials.clientId)
         ]
         allQueryItems.append(contentsOf: queryItems)
+        allQueryItems.append(URLQueryItem(name: "timestamp", value: timestamp))
 
-        var components = URLComponents(url: baseURL.appendingPathComponent(path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))), resolvingAgainstBaseURL: false)!
+        var components = URLComponents(url: URL(string: "\(baseURL.absoluteString)\(path)")!, resolvingAgainstBaseURL: false)!
         components.queryItems = allQueryItems
         guard let url = components.url else { throw SnapTradeError.invalidResponse }
 
@@ -133,7 +133,7 @@ final class SnapTradeService {
             "path": .string("/api/v1\(path)"),
             "query": .string(query)
         ]))
-        let signingKey = credentials.consumerKey.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? credentials.consumerKey
+        let signingKey = encodeURI(credentials.consumerKey)
         let signature = hmacSHA256Base64(message: signaturePayload, key: signingKey)
 
         var request = URLRequest(url: url)
@@ -167,8 +167,7 @@ final class SnapTradeService {
         case .number(let value):
             return NSDecimalNumber(decimal: value).stringValue
         case .string(let value):
-            let data = try? JSONEncoder().encode(value)
-            return data.flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
+            return quotedJSONString(value)
         case .object(let object):
             let pairs = object.keys.sorted().map { key in
                 "\(sortedJSONString(.string(key))):\(sortedJSONString(object[key] ?? .null))"
@@ -183,6 +182,42 @@ final class SnapTradeService {
         let symmetricKey = SymmetricKey(data: Data(key.utf8))
         let code = HMAC<SHA256>.authenticationCode(for: Data(message.utf8), using: symmetricKey)
         return Data(code).base64EncodedString()
+    }
+
+    private func encodeURI(_ value: String) -> String {
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-_.!~*'();/?:@&=+$,#")
+        return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+    }
+
+    private func quotedJSONString(_ value: String) -> String {
+        var result = "\""
+        for scalar in value.unicodeScalars {
+            switch scalar {
+            case "\"":
+                result += "\\\""
+            case "\\":
+                result += "\\\\"
+            case "\u{08}":
+                result += "\\b"
+            case "\u{0C}":
+                result += "\\f"
+            case "\n":
+                result += "\\n"
+            case "\r":
+                result += "\\r"
+            case "\t":
+                result += "\\t"
+            default:
+                if scalar.value < 0x20 {
+                    result += String(format: "\\u%04X", scalar.value)
+                } else {
+                    result.unicodeScalars.append(scalar)
+                }
+            }
+        }
+        result += "\""
+        return result
     }
 }
 
