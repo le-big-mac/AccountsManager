@@ -197,6 +197,18 @@ final class PriceService {
         }
     }
 
+    func refreshHoldingFXRates(_ holdings: [Holding]) async {
+        for holding in holdings {
+            do {
+                let fxRate = try await fetchFXRateToGBP(from: holding.priceCurrency)
+                holding.fxRateToGBP = fxRate
+                holding.fxRateDate = Date()
+            } catch {
+                continue
+            }
+        }
+    }
+
     private func fetchVanguardQuote(for holding: Holding) async throws -> CachedQuote? {
         guard let portId = try await vanguardPortId(for: holding) else { return nil }
         let cacheKey = "vanguard:\(portId)"

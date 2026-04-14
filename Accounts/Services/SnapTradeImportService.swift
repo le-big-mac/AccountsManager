@@ -21,7 +21,7 @@ enum SnapTradeImportService {
             account.snapTradeInstitutionName = snapTradeAccount.institutionName
         }
 
-        await PriceService.shared.refreshHoldings(account.holdings)
+        await PriceService.shared.refreshHoldingFXRates(account.holdings)
         await PriceService.shared.refreshCashBalances(account.cashBalances)
     }
 
@@ -61,7 +61,7 @@ enum SnapTradeImportService {
             guard let position = positions.first(where: { ($0.symbol?.symbol?.symbol ?? $0.symbol?.symbol?.rawSymbol) == holding.ticker }),
                   let price = position.price else { continue }
             holding.lastPrice = price
-            holding.priceCurrency = position.currency?.code ?? holding.priceCurrency
+            holding.priceCurrency = position.currency?.code ?? position.symbol?.symbol?.currency?.code ?? holding.priceCurrency
             holding.lastPriceDate = Date()
         }
     }
