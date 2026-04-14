@@ -41,6 +41,7 @@ actor TrueLayerService {
         guard let clientId = KeychainHelper.load(.trueLayerClientId) else { return nil }
 
         let state = UUID().uuidString
+        let providers = providerId ?? "uk-ob-all"
 
         var components = URLComponents(string: "\(authBaseURL)/")!
         components.queryItems = [
@@ -48,7 +49,7 @@ actor TrueLayerService {
             URLQueryItem(name: "client_id", value: clientId),
             URLQueryItem(name: "scope", value: "accounts balance transactions info offline_access"),
             URLQueryItem(name: "redirect_uri", value: redirectURI),
-            URLQueryItem(name: "providers", value: "uk-ob-all"),
+            URLQueryItem(name: "providers", value: providers),
             URLQueryItem(name: "state", value: state),
         ]
         guard let url = components.url else { return nil }
@@ -97,13 +98,10 @@ actor TrueLayerService {
 
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
 
-        if let refresh = tokenResponse.refreshToken {
-            KeychainHelper.save(refresh, for: .trueLayerRefreshToken)
-        }
-
         return TokenPair(
             accessToken: tokenResponse.accessToken,
-            expiresAt: Date().addingTimeInterval(TimeInterval(tokenResponse.expiresIn))
+            expiresAt: Date().addingTimeInterval(TimeInterval(tokenResponse.expiresIn)),
+            refreshToken: tokenResponse.refreshToken
         )
     }
 
@@ -137,7 +135,8 @@ actor TrueLayerService {
         ]
         request.httpBody = bodyComponents.percentEncodedQuery.flatMap { Data($0.utf8) }
 
-        let (data, _) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request)
+        try validateHTTPResponse(response, data: data)
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
 
         return RefreshResult(
@@ -151,24 +150,31 @@ actor TrueLayerService {
     func listAccounts(accessToken: String) async throws -> [BankAccount] {
         let url = URL(string: "\(apiBaseURL)/accounts")!
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
 
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
 
-        let (data, _) = try await session.data(for: request)
-        let response = try JSONDecoder().decode(AccountsResponse.self, from: data)
-        return response.results
+        let (data, response) = try await session.data(for: request)
+        logDataResponse("accounts", response: response, data: data)
+        try validateHTTPResponse(response, data: data)
+        let accountsResponse = try JSONDecoder().decode(AccountsResponse.self, from: data)
+        return accountsResponse.results
     }
 
     func fetchBalance(accountId: String, accessToken: String) async throws -> Decimal {
         let url = URL(string: "\(apiBaseURL)/accounts/\(accountId)/balance")!
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
 
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
 
-        let (data, _) = try await session.data(for: request)
-        let response = try JSONDecoder().decode(BalancesResponse.self, from: data)
+        let (data, response) = try await session.data(for: request)
+        try validateHTTPResponse(response, data: data)
+        let balancesResponse = try JSONDecoder().decode(BalancesResponse.self, from: data)
 
-        guard let balance = response.results.first else {
+        guard let balance = balancesResponse.results.first else {
             throw TrueLayerError.noBalance
         }
 
@@ -203,6 +209,7 @@ actor TrueLayerService {
     struct TokenPair {
         let accessToken: String
         let expiresAt: Date
+        let refreshToken: String?
     }
 
     struct AccountsResponse: Decodable {
@@ -282,6 +289,32 @@ actor TrueLayerService {
             case currency
             case currentBalanceInMinor = "current_balance_in_minor"
             case availableBalanceInMinor = "available_balance_in_minor"
+        }
+    }
+
+    private func validateHTTPResponse(_ response: URLResponse, data: Data) throws {
+        guard let httpResponse = response as? HTTPURLResponse else { return }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            if let errorBody = try? JSONDecoder().decode(TrueLayerErrorResponse.self, from: data) {
+                throw TrueLayerError.apiError(errorBody.error, errorBody.errorDescription ?? "Unknown error")
+            }
+            let bodyString = String(data: data, encoding: .utf8) ?? "No response body"
+            throw TrueLayerError.apiError("http_\(httpResponse.statusCode)", bodyString)
+        }
+    }
+
+    private func logDataResponse(_ name: String, response: URLResponse, data: Data) {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            DebugLog.write("TrueLayer \(name): non-HTTP response, \(data.count) bytes")
+            return
+        }
+
+        let requestId = httpResponse.value(forHTTPHeaderField: "x-request-id") ?? "nil"
+        let cacheControl = httpResponse.value(forHTTPHeaderField: "cache-control") ?? "nil"
+        DebugLog.write("TrueLayer \(name): status=\(httpResponse.statusCode) bytes=\(data.count) requestId=\(requestId) cacheControl=\(cacheControl)")
+
+        if let body = String(data: data, encoding: .utf8) {
+            DebugLog.write("TrueLayer \(name) body: \(body.prefix(4000))")
         }
     }
 }

@@ -8,7 +8,7 @@ final class Account {
     var accountTypeRaw: String
     var trueLayerAccountId: String?    // comma-separated for multiple accounts
     var trueLayerRefreshToken: String?  // per-account refresh token
-    var trueLayerProvider: String?     // e.g. "Revolut", "Santander" -- used to filter
+    var trueLayerProvider: String?     // provider_id when available, otherwise display name -- used to filter
     var sortOrder: Int
     var isArchived: Bool
     var createdAt: Date

@@ -21,10 +21,28 @@ struct BankConnectionView: View {
         var providers = Set<String>()
         for a in allAccounts where a.id != account.id {
             if let provider = a.trueLayerProvider {
-                providers.insert(provider.lowercased())
+                providers.insert(normalizedProviderKey(provider))
             }
         }
         return providers
+    }
+
+    private func normalizedProviderKey(_ provider: String) -> String {
+        provider.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func providerKeys(for bankAccount: TrueLayerService.BankAccount) -> Set<String> {
+        [
+            bankAccount.provider?.providerId,
+            bankAccount.provider?.displayName,
+        ]
+        .compactMap { $0 }
+        .map(normalizedProviderKey)
+        .reduce(into: Set<String>()) { $0.insert($1) }
+    }
+
+    private func providerStorageValue(for bankAccount: TrueLayerService.BankAccount) -> String? {
+        bankAccount.provider?.providerId ?? bankAccount.provider?.displayName
     }
 
     enum ConnectionStatus {
@@ -90,7 +108,7 @@ struct BankConnectionView: View {
                 .multilineTextAlignment(.center)
 
             Button("Connect Bank Account") {
-                openTrueLayerAuth()
+                Task { await openTrueLayerAuth() }
             }
             .buttonStyle(.borderedProminent)
         }
@@ -195,8 +213,8 @@ struct BankConnectionView: View {
         }
     }
 
-    private func openTrueLayerAuth() {
-        guard let result = TrueLayerService.shared.buildAuthURL() else {
+    private func openTrueLayerAuth() async {
+        guard let result = await TrueLayerService.shared.buildAuthURL() else {
             error = "TrueLayer not configured. Add credentials in Settings."
             return
         }
@@ -217,22 +235,26 @@ struct BankConnectionView: View {
             log("Got access token: \(tokenPair.accessToken.prefix(20))...")
 
             // Store refresh token on this specific account
-            if let refresh = KeychainHelper.load(.trueLayerRefreshToken) {
-                account.trueLayerRefreshToken = refresh
+            guard let refresh = tokenPair.refreshToken else {
+                self.error = "TrueLayer did not return a refresh token. Check that offline_access is enabled for this client."
+                status = .ready
+                return
             }
+            account.trueLayerRefreshToken = refresh
 
             let allBankAccounts = try await TrueLayerService.shared.listAccounts(accessToken: tokenPair.accessToken)
             log("Returned \(allBankAccounts.count) accounts:")
             for ba in allBankAccounts {
-                log("  - id=\(ba.accountId.prefix(16))... provider=\(ba.provider?.displayName ?? "nil") type=\(ba.accountType ?? "nil") name=\(ba.displayName ?? "nil")")
+                log("  - id=\(ba.accountId.prefix(16))... providerId=\(ba.provider?.providerId ?? "nil") provider=\(ba.provider?.displayName ?? "nil") type=\(ba.accountType ?? "nil") name=\(ba.displayName ?? "nil")")
             }
 
             // Filter out accounts from providers already connected
             let excluded = alreadyConnectedProviders
             log("Already connected providers: \(excluded)")
             bankAccounts = allBankAccounts.filter { ba in
-                guard let providerName = ba.provider?.displayName else { return true }
-                return !excluded.contains(providerName.lowercased())
+                let keys = providerKeys(for: ba)
+                guard !keys.isEmpty else { return true }
+                return excluded.isDisjoint(with: keys)
             }
             log("After filtering: \(bankAccounts.count) accounts")
 
@@ -262,7 +284,7 @@ struct BankConnectionView: View {
     private func connectAllAccounts() {
         let allIds = bankAccounts.map { $0.accountId }.joined(separator: ",")
         account.trueLayerAccountId = allIds
-        account.trueLayerProvider = bankAccounts.first?.provider?.displayName
+        account.trueLayerProvider = bankAccounts.first.flatMap(providerStorageValue)
         status = .connected
 
         Task {
@@ -282,7 +304,7 @@ struct BankConnectionView: View {
 
     private func selectAccount(_ bankAccount: TrueLayerService.BankAccount) {
         account.trueLayerAccountId = bankAccount.accountId
-        account.trueLayerProvider = bankAccount.provider?.displayName
+        account.trueLayerProvider = providerStorageValue(for: bankAccount)
         status = .connected
 
         Task {
