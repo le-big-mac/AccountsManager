@@ -32,42 +32,8 @@ struct AccountDetailView: View {
                 Divider()
 
                 if account.accountType == .investment {
+                    investmentActions
                     HoldingsView(account: account)
-
-                    HStack {
-                        if account.investmentSourceType == .snapTrade {
-                            Label(account.snapTradeInstitutionName ?? "SnapTrade", systemImage: "link")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        } else if let csvSourcePath = account.csvSourcePath {
-                            Label(URL(fileURLWithPath: csvSourcePath).lastPathComponent, systemImage: "link")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-
-                        if account.investmentSourceType == .snapTrade {
-                            Button {
-                                showingSnapTradeConnection = true
-                            } label: {
-                                Label(account.snapTradeAccountId == nil ? "Connect Robinhood" : "Reconnect", systemImage: "link.badge.plus")
-                            }
-                        } else {
-                            Button {
-                                showingCSVImport = true
-                            } label: {
-                                Label("Import CSV", systemImage: "doc.badge.plus")
-                            }
-                        }
-
-                        Button {
-                            Task { await refreshPrices() }
-                        } label: {
-                            Label(isRefreshing ? "Refreshing..." : refreshLabel,
-                                  systemImage: "arrow.clockwise")
-                        }
-                        .disabled(isRefreshing)
-                    }
                 } else {
                     // Bank account
                     if account.trueLayerAccountId == nil {
@@ -110,6 +76,43 @@ struct AccountDetailView: View {
 
     private var refreshLabel: String {
         account.investmentSourceType == .snapTrade ? "Sync SnapTrade" : "Refresh Prices"
+    }
+
+    private var investmentActions: some View {
+        HStack {
+            if account.investmentSourceType == .snapTrade {
+                Label(account.snapTradeInstitutionName ?? "SnapTrade", systemImage: "link")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if let csvSourcePath = account.csvSourcePath {
+                Label(URL(fileURLWithPath: csvSourcePath).lastPathComponent, systemImage: "link")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+
+            if account.investmentSourceType == .snapTrade {
+                Button {
+                    showingSnapTradeConnection = true
+                } label: {
+                    Label(account.snapTradeAccountId == nil ? "Connect Robinhood" : "Reconnect", systemImage: "link.badge.plus")
+                }
+            } else {
+                Button {
+                    showingCSVImport = true
+                } label: {
+                    Label("Import CSV", systemImage: "doc.badge.plus")
+                }
+            }
+
+            Button {
+                Task { await refreshPrices() }
+            } label: {
+                Label(isRefreshing ? "Refreshing..." : refreshLabel,
+                      systemImage: "arrow.clockwise")
+            }
+            .disabled(isRefreshing)
+        }
     }
 
     @ViewBuilder

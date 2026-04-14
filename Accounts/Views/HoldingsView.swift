@@ -65,11 +65,6 @@ struct CashBalanceRow: View {
                     Text(cash.amount.formattedCurrency(code: cash.currency))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    if cash.currency != "GBP", cash.effectiveFXRateToGBP > 0 {
-                        Text("FX \(cash.effectiveFXRateToGBP as NSDecimalNumber)")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
                 }
             }
 
@@ -109,11 +104,6 @@ struct HoldingRow: View {
                         Text("@ \(price.formattedCurrency(code: holding.priceCurrency))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        if holding.priceCurrency != "GBP", holding.effectiveFXRateToGBP > 0 {
-                            Text("FX \(holding.effectiveFXRateToGBP as NSDecimalNumber)")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                        }
                     }
                 }
             }
