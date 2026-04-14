@@ -1,0 +1,17 @@
+.DS_Store
+
+# Xcode user state and build products
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+
+# Swift/Xcode runtime profiling artifacts
+*.profraw
+*.profdata
+
+# Local app data and credentials
+credentials.json
+debug.log
+default.store
+default.store-*
