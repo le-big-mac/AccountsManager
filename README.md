@@ -151,3 +151,7 @@ The current parser is built around the app's account import flow rather than a p
 - This is a personal-use app, not a production product
 - Some external integrations are intentionally lightweight and rely on local credentials and local persistence
 - The repo is safe to publish as code, but the app still uses local filesystem storage for secrets and data
+
+## Warning
+
+This project was built in a heavily iterative, AI-assisted way. Treat it as practical personal software, not as a polished reference implementation. Review the code carefully before extending it, publishing derivatives, or trusting it with anything important.
