@@ -11,6 +11,9 @@ final class PriceService {
     private var analystTargetCache: [String: CachedAnalystTarget] = [:]
     private var vanguardProductsCache: [VanguardProduct]?
     private var analystTargetRefreshTask: Task<Void, Never>?
+    private var queuedAnalystTargetTickers: Set<String> = []
+    private var refreshedAnalystTargetTickers: Set<String> = []
+    private var pendingAnalystTargetHoldings: [Holding] = []
     private var lastAlphaVantageRequestAt: Date?
 
     struct CachedQuote {
@@ -215,9 +218,25 @@ final class PriceService {
     }
 
     func scheduleAnalystTargetRefresh(_ holdings: [Holding]) {
-        analystTargetRefreshTask?.cancel()
+        guard alphaVantageApiKey != nil else { return }
+
+        for holding in holdings {
+            guard supportsAnalystTargets(for: holding),
+                  needsAnalystTargetRefresh(for: holding),
+                  let ticker = holding.ticker,
+                  !ticker.isEmpty,
+                  !queuedAnalystTargetTickers.contains(ticker),
+                  !refreshedAnalystTargetTickers.contains(ticker) else {
+                continue
+            }
+            queuedAnalystTargetTickers.insert(ticker)
+            pendingAnalystTargetHoldings.append(holding)
+        }
+
+        guard analystTargetRefreshTask == nil else { return }
         analystTargetRefreshTask = Task { @MainActor in
-            await refreshAnalystTargets(holdings)
+            defer { self.analystTargetRefreshTask = nil }
+            await self.refreshQueuedAnalystTargets()
         }
     }
 
@@ -233,17 +252,20 @@ final class PriceService {
         }
     }
 
-    private func refreshAnalystTargets(_ holdings: [Holding]) async {
+    private func refreshQueuedAnalystTargets() async {
         guard alphaVantageApiKey != nil else { return }
 
-        let eligibleHoldings = holdings.filter { holding in
-            supportsAnalystTargets(for: holding) && needsAnalystTargetRefresh(for: holding)
-        }
-
-        for holding in eligibleHoldings {
+        while !pendingAnalystTargetHoldings.isEmpty {
             guard !Task.isCancelled else { return }
             guard canUseAlphaVantageRequestBudget() else { return }
+            let holding = pendingAnalystTargetHoldings.removeFirst()
             guard let ticker = holding.ticker else { continue }
+            queuedAnalystTargetTickers.remove(ticker)
+
+            guard supportsAnalystTargets(for: holding),
+                  needsAnalystTargetRefresh(for: holding) else {
+                continue
+            }
 
             do {
                 if let target = try await fetchAnalystTarget(ticker: ticker, currency: holding.priceCurrency) {
@@ -252,14 +274,19 @@ final class PriceService {
                     holding.analystTargetHigh = target.high
                     holding.analystTargetCurrency = target.currency
                     holding.analystTargetUpdatedAt = Date()
-                } else {
-                    clearAnalystTarget(on: holding)
+                    refreshedAnalystTargetTickers.insert(ticker)
+                } else if holding.analystTargetUpdatedAt == nil {
+                    holding.analystTargetUpdatedAt = Date()
+                    refreshedAnalystTargetTickers.insert(ticker)
                 }
             } catch {
                 if let priceError = error as? PriceError, priceError == .rateLimited {
                     return
                 }
-                clearAnalystTarget(on: holding)
+                if holding.analystConsensusTarget != nil || holding.analystTargetLow != nil || holding.analystTargetHigh != nil {
+                    holding.analystTargetUpdatedAt = holding.analystTargetUpdatedAt ?? Date()
+                    refreshedAnalystTargetTickers.insert(ticker)
+                }
             }
         }
     }
@@ -404,6 +431,9 @@ final class PriceService {
         cache.removeAll()
         fxCache.removeAll()
         analystTargetCache.removeAll()
+        queuedAnalystTargetTickers.removeAll()
+        refreshedAnalystTargetTickers.removeAll()
+        pendingAnalystTargetHoldings.removeAll()
     }
 
     private func supportsAnalystTargets(for holding: Holding) -> Bool {
@@ -413,14 +443,6 @@ final class PriceService {
         case .cash, .fund, .other:
             return false
         }
-    }
-
-    private func clearAnalystTarget(on holding: Holding) {
-        holding.analystConsensusTarget = nil
-        holding.analystTargetLow = nil
-        holding.analystTargetHigh = nil
-        holding.analystTargetCurrencyRaw = ""
-        holding.analystTargetUpdatedAt = nil
     }
 
     private func needsAnalystTargetRefresh(for holding: Holding) -> Bool {
