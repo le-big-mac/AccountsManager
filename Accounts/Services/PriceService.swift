@@ -7,6 +7,7 @@ final class PriceService {
     private let stableBaseURL = "https://financialmodelingprep.com/stable"
     private var cache: [String: CachedQuote] = [:]
     private var fxCache: [String: CachedFXRate] = [:]
+    private var analystTargetCache: [String: CachedAnalystTarget] = [:]
     private var vanguardProductsCache: [VanguardProduct]?
 
     struct CachedQuote {
@@ -19,6 +20,14 @@ final class PriceService {
 
     struct CachedFXRate {
         let rate: Decimal
+        let fetchedAt: Date
+    }
+
+    struct CachedAnalystTarget {
+        let consensus: Decimal?
+        let low: Decimal?
+        let high: Decimal?
+        let currency: String
         let fetchedAt: Date
     }
 
@@ -61,6 +70,14 @@ final class PriceService {
         let percentChange: String?
         let amountChange: String?
         let asOfDate: String?
+    }
+
+    struct FMPPriceTargetConsensus: Decodable {
+        let symbol: String?
+        let targetHigh: Double?
+        let targetLow: Double?
+        let targetConsensus: Double?
+        let targetMedian: Double?
     }
 
     private var apiKey: String? {
@@ -191,9 +208,32 @@ final class PriceService {
                 holding.fxRateToGBP = fxRate
                 holding.fxRateDate = Date()
                 holding.lastPriceDate = Date()
+                await refreshAnalystTarget(for: holding)
             } catch {
                 continue
             }
+        }
+    }
+
+    func refreshAnalystTarget(for holding: Holding) async {
+        guard let ticker = holding.ticker,
+              supportsAnalystTargets(for: holding) else {
+            clearAnalystTarget(on: holding)
+            return
+        }
+
+        do {
+            if let target = try await fetchAnalystTarget(ticker: ticker, currency: holding.priceCurrency) {
+                holding.analystConsensusTarget = target.consensus
+                holding.analystTargetLow = target.low
+                holding.analystTargetHigh = target.high
+                holding.analystTargetCurrency = target.currency
+                holding.analystTargetUpdatedAt = Date()
+            } else {
+                clearAnalystTarget(on: holding)
+            }
+        } catch {
+            clearAnalystTarget(on: holding)
         }
     }
 
@@ -207,6 +247,47 @@ final class PriceService {
                 continue
             }
         }
+    }
+
+    private func fetchAnalystTarget(ticker: String, currency: String) async throws -> CachedAnalystTarget? {
+        if let cached = analystTargetCache[ticker],
+           Date().timeIntervalSince(cached.fetchedAt) < 21_600 {
+            return cached
+        }
+
+        guard let apiKey else { throw PriceError.notConfigured }
+
+        var components = URLComponents(string: "\(stableBaseURL)/price-target-consensus")!
+        components.queryItems = [
+            URLQueryItem(name: "symbol", value: ticker),
+            URLQueryItem(name: "apikey", value: apiKey)
+        ]
+        let url = components.url!
+        let (data, _) = try await URLSession.shared.data(from: url)
+        let targets = try JSONDecoder().decode([FMPPriceTargetConsensus].self, from: data)
+        guard let target = targets.first else {
+            analystTargetCache[ticker] = CachedAnalystTarget(
+                consensus: nil,
+                low: nil,
+                high: nil,
+                currency: normalizedCurrency(currency),
+                fetchedAt: Date()
+            )
+            return nil
+        }
+
+        let cached = CachedAnalystTarget(
+            consensus: target.targetConsensus.map { Decimal($0) },
+            low: target.targetLow.map { Decimal($0) },
+            high: target.targetHigh.map { Decimal($0) },
+            currency: normalizedCurrency(currency),
+            fetchedAt: Date()
+        )
+        analystTargetCache[ticker] = cached
+        if cached.consensus == nil, cached.low == nil, cached.high == nil {
+            return nil
+        }
+        return cached
     }
 
     private func fetchVanguardQuote(for holding: Holding) async throws -> CachedQuote? {
@@ -295,6 +376,24 @@ final class PriceService {
     func clearCache() {
         cache.removeAll()
         fxCache.removeAll()
+        analystTargetCache.removeAll()
+    }
+
+    private func supportsAnalystTargets(for holding: Holding) -> Bool {
+        switch holding.assetClass {
+        case .stock, .etf:
+            return holding.ticker != nil
+        case .cash, .fund, .other:
+            return false
+        }
+    }
+
+    private func clearAnalystTarget(on holding: Holding) {
+        holding.analystConsensusTarget = nil
+        holding.analystTargetLow = nil
+        holding.analystTargetHigh = nil
+        holding.analystTargetCurrencyRaw = ""
+        holding.analystTargetUpdatedAt = nil
     }
 
     private func normalizedCurrency(_ currency: String) -> String {

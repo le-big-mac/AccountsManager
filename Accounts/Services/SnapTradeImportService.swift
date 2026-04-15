@@ -37,6 +37,9 @@ enum SnapTradeImportService {
         }
 
         await PriceService.shared.refreshHoldingFXRates(account.holdings)
+        for holding in account.holdings {
+            await PriceService.shared.refreshAnalystTarget(for: holding)
+        }
         await PriceService.shared.refreshCashBalances(account.cashBalances)
     }
 

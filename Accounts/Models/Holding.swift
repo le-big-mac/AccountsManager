@@ -56,6 +56,11 @@ final class Holding {
     var fxRateToGBP: Decimal?
     var fxRateDate: Date?
     var lastPriceDate: Date?
+    var analystConsensusTarget: Decimal?
+    var analystTargetLow: Decimal?
+    var analystTargetHigh: Decimal?
+    var analystTargetCurrencyRaw: String = ""
+    var analystTargetUpdatedAt: Date?
     var account: Account?
 
     var currentValue: Decimal {
@@ -97,6 +102,24 @@ final class Holding {
 
     var priceIdentifier: String? {
         ticker ?? isin ?? sedol
+    }
+
+    var analystTargetCurrency: String {
+        get {
+            let stored = normalizedCurrency(analystTargetCurrencyRaw)
+            return stored.isEmpty ? priceCurrency : stored
+        }
+        set { analystTargetCurrencyRaw = normalizedCurrency(newValue) }
+    }
+
+    var analystConsensusUpsidePercent: Decimal? {
+        guard let target = analystConsensusTarget,
+              let price = lastPrice,
+              price != 0,
+              analystTargetCurrency == priceCurrency else {
+            return nil
+        }
+        return (target - price) / price
     }
 
     private var inferredPriceCurrency: String {
