@@ -2,14 +2,25 @@ import Foundation
 
 @MainActor
 enum BankSyncService {
+    enum TransactionSyncStatus {
+        case synced
+        case requiresReauthentication
+        case failed(String)
+    }
+
+    struct SyncResult {
+        var transactionStatus: TransactionSyncStatus = .synced
+    }
+
     static func sync(
         account: Account,
         accessToken: String,
         knownAccounts: [TrueLayerService.BankAccount] = []
-    ) async {
-        guard let accountIds = account.trueLayerAccountId else { return }
+    ) async -> SyncResult {
+        guard let accountIds = account.trueLayerAccountId else { return SyncResult() }
         let ids = accountIds.split(separator: ",").map(String.init)
         let knownById = Dictionary(uniqueKeysWithValues: knownAccounts.map { ($0.accountId, $0) })
+        var result = SyncResult()
 
         var totalGBP: Decimal = 0
         var activeBalanceIds = Set<String>()
@@ -52,6 +63,15 @@ enum BankSyncService {
                 mergeTransactions(transactions, into: account)
             } catch {
                 DebugLog.write("TrueLayer transactions sync failed for \(id.prefix(8)): \(error.localizedDescription)")
+                if case TrueLayerError.apiError(let code, let message) = error {
+                    if code == "sca_exceeded" {
+                        result.transactionStatus = .requiresReauthentication
+                    } else if case .synced = result.transactionStatus {
+                        result.transactionStatus = .failed(message)
+                    }
+                } else if case .synced = result.transactionStatus {
+                    result.transactionStatus = .failed(error.localizedDescription)
+                }
             }
         }
 
@@ -60,6 +80,8 @@ enum BankSyncService {
         if !activeBalanceIds.isEmpty {
             account.balanceEntries.append(BalanceEntry(amount: totalGBP, source: .bankSync))
         }
+
+        return result
     }
 
     private static func mergeTransactions(

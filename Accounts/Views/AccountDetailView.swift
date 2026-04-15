@@ -8,6 +8,7 @@ struct AccountDetailView: View {
     @State private var showingCSVImport = false
     @State private var showingBankConnection = false
     @State private var showingSnapTradeConnection = false
+    @State private var bankSyncNotice: String?
 
     var body: some View {
         ScrollView {
@@ -79,6 +80,17 @@ struct AccountDetailView: View {
         }
         .sheet(isPresented: $showingSnapTradeConnection) {
             SnapTradeConnectionView(account: account)
+        }
+        .alert(
+            "Bank Sync Notice",
+            isPresented: Binding(
+                get: { bankSyncNotice != nil },
+                set: { if !$0 { bankSyncNotice = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(bankSyncNotice ?? "")
         }
     }
 
@@ -224,7 +236,16 @@ struct AccountDetailView: View {
         defer { isRefreshing = false }
         do {
             let accessToken = try await getValidAccessToken()
-            await BankSyncService.sync(account: account, accessToken: accessToken)
+            let result = await BankSyncService.sync(account: account, accessToken: accessToken)
+            try? modelContext.save()
+            switch result.transactionStatus {
+            case .synced:
+                break
+            case .requiresReauthentication:
+                bankSyncNotice = "Balance updated, but recent transactions require reconnecting this bank in TrueLayer. The provider is returning sca_exceeded for the transactions endpoint after the PSU authentication window expires."
+            case .failed(let message):
+                bankSyncNotice = "Balance updated, but transaction sync failed: \(message)"
+            }
         } catch {
             // Token refresh failed
         }
