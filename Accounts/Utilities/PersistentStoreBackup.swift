@@ -70,7 +70,7 @@ enum PersistentStoreBackup {
             for suffix in ["", "-wal", "-shm"] {
                 let source = accountsApplicationSupport.appendingPathComponent("\(storeBaseName)\(suffix)")
                 guard fileManager.fileExists(atPath: source.path) else { continue }
-                let destination = backupDirectory.appendingPathComponent("default.store\(suffix)")
+                let destination = backupDirectory.appendingPathComponent("\(storeBaseName)\(suffix)")
                 try fileManager.copyItem(at: source, to: destination)
             }
 

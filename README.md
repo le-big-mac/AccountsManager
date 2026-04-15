@@ -101,7 +101,7 @@ For personal use on the same Mac, build `Release` and copy `Accounts.app` into `
 
 The app's data is stored outside the app bundle, so replacing the installed app does not remove:
 
-- `~/Library/Application Support/default.store`
+- `~/Library/Application Support/Accounts/Accounts.store`
 - `~/Library/Application Support/Accounts/credentials.json`
 
 Those files contain your local data and credentials and are not affected by replacing `/Applications/Accounts.app`.
@@ -110,7 +110,12 @@ Those files contain your local data and credentials and are not affected by repl
 
 SwiftData store:
 
-- `~/Library/Application Support/default.store`
+- `~/Library/Application Support/Accounts/Accounts.store`
+
+Legacy migrations:
+
+- older builds may have used `~/Library/Application Support/default.store`
+- current builds migrate that legacy store into the app-specific path above on launch
 
 Debug log:
 
