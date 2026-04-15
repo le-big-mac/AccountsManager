@@ -26,6 +26,7 @@ struct ParsedHolding {
     let units: Decimal
     let priceCurrency: String
     let assetClass: HoldingAssetClass?
+    let averagePurchasePrice: Decimal?
 }
 
 struct ParsedCashBalance {
@@ -154,6 +155,7 @@ struct CSVParser {
         let tickerIdx = index["ticker"]
         let isinIdx = index["isin"]
         let sedolIdx = index["sedol"]
+        let averagePurchasePriceIdx = index["averagepurchaseprice"] ?? index["averageprice"] ?? index["costbasis"]
 
         return rows.compactMap { row in
             let assetClass = HoldingAssetClass.from(value(row, at: assetClassIdx))
@@ -170,7 +172,8 @@ struct CSVParser {
                 sedol: value(row, at: sedolIdx).flatMap(nonEmpty),
                 units: abs(units),
                 priceCurrency: value(row, at: currencyIdx).flatMap(nonEmpty) ?? "GBP",
-                assetClass: assetClass
+                assetClass: assetClass,
+                averagePurchasePrice: value(row, at: averagePurchasePriceIdx).flatMap(parseDecimal)
             )
         }
     }
@@ -218,7 +221,7 @@ struct CSVParser {
         }
 
         return holdingMap.map { name, units in
-            ParsedHolding(name: name, ticker: nil, isin: nil, sedol: nil, units: abs(units), priceCurrency: "GBP", assetClass: .fund)
+            ParsedHolding(name: name, ticker: nil, isin: nil, sedol: nil, units: abs(units), priceCurrency: "GBP", assetClass: .fund, averagePurchasePrice: nil)
         }
     }
 
@@ -247,7 +250,7 @@ struct CSVParser {
         }
 
         return holdingMap.map { key, value in
-            ParsedHolding(name: value.name, ticker: key, isin: nil, sedol: nil, units: abs(value.units), priceCurrency: "USD", assetClass: .stock)
+            ParsedHolding(name: value.name, ticker: key, isin: nil, sedol: nil, units: abs(value.units), priceCurrency: "USD", assetClass: .stock, averagePurchasePrice: nil)
         }.filter { $0.units > 0 }
     }
 
@@ -275,7 +278,7 @@ struct CSVParser {
         }
 
         return holdingMap.map { _, value in
-            ParsedHolding(name: value.name, ticker: nil, isin: nil, sedol: value.sedol, units: abs(value.units), priceCurrency: "GBP", assetClass: HoldingAssetClass.from(value.name))
+            ParsedHolding(name: value.name, ticker: nil, isin: nil, sedol: value.sedol, units: abs(value.units), priceCurrency: "GBP", assetClass: HoldingAssetClass.from(value.name), averagePurchasePrice: nil)
         }.filter { $0.units > 0 }
     }
 

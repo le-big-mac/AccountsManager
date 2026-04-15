@@ -51,13 +51,12 @@ final class Holding {
     var sedol: String?
     var units: Decimal
     var lastPrice: Decimal?
+    var averagePurchasePrice: Decimal?
     var priceCurrencyRaw: String = ""
     var assetClassRaw: String?
     var fxRateToGBP: Decimal?
     var fxRateDate: Date?
     var lastPriceDate: Date?
-    var dailyChange: Decimal?
-    var dailyChangePercent: Decimal?
     var analystConsensusTarget: Decimal?
     var analystTargetLow: Decimal?
     var analystTargetHigh: Decimal?
@@ -122,6 +121,15 @@ final class Holding {
             return nil
         }
         return (target - price) / price
+    }
+
+    var openPnLPercent: Decimal? {
+        guard let averagePurchasePrice,
+              let price = lastPrice,
+              averagePurchasePrice > 0 else {
+            return nil
+        }
+        return (price - averagePurchasePrice) / averagePurchasePrice
     }
 
     private var inferredPriceCurrency: String {

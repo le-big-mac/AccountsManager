@@ -61,7 +61,8 @@ enum SnapTradeImportService {
                 sedol: nil,
                 units: abs(units),
                 priceCurrency: currency,
-                assetClass: HoldingAssetClass.from(name) ?? .stock
+                assetClass: HoldingAssetClass.from(name) ?? .stock,
+                averagePurchasePrice: position.averagePurchasePrice
             )
         }
     }
@@ -72,6 +73,7 @@ enum SnapTradeImportService {
                   let price = position.price else { continue }
             holding.lastPrice = price
             holding.priceCurrency = position.currency?.code ?? position.symbol?.symbol?.currency?.code ?? holding.priceCurrency
+            holding.averagePurchasePrice = position.averagePurchasePrice
             holding.lastPriceDate = Date()
         }
     }

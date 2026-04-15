@@ -272,6 +272,7 @@ struct SnapTradeBalance: Decodable {
 struct SnapTradePosition: Decodable {
     let symbol: SnapTradePositionSymbol?
     let price: Decimal?
+    let averagePurchasePrice: Decimal?
     let units: Decimal?
     let fractionalUnits: Decimal?
     let currency: SnapTradeCurrency?
@@ -280,6 +281,7 @@ struct SnapTradePosition: Decodable {
     enum CodingKeys: String, CodingKey {
         case symbol
         case price
+        case averagePurchasePrice = "average_purchase_price"
         case units
         case fractionalUnits = "fractional_units"
         case currency

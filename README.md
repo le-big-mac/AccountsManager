@@ -144,6 +144,7 @@ Expected columns:
 - `assetClass`
 - `units`
 - `currency`
+- optional `averagePurchasePrice`
 - optional `ticker`
 - optional `isin`
 - optional `sedol`
@@ -155,16 +156,17 @@ Rules:
 - `cash` rows become cash balances
 - for cash rows, the amount is stored in `units`
 - `currency` is the holding price currency or the cash currency
+- `averagePurchasePrice` is optional and stores per-unit cost basis for open P&L display
 - `ticker`, `isin`, and `sedol` are optional, but at least one identifier is useful for live pricing
 
 Example:
 
 ```csv
-name,assetClass,units,currency,ticker,isin,sedol
-FTSE Global All Cap Index Fund Accumulation,fund,36.9627,GBP,VAFTGAG,GB00BD3RZ582,
-Apple Inc,stock,12,USD,AAPL,US0378331005,
-USD Cash,cash,18003.45,USD,,,
-GBP Cash,cash,130.12,GBP,,,
+name,assetClass,units,currency,averagePurchasePrice,ticker,isin,sedol
+FTSE Global All Cap Index Fund Accumulation,fund,36.9627,GBP,252.40,VAFTGAG,GB00BD3RZ582,
+Apple Inc,stock,12,USD,182.15,AAPL,US0378331005,
+USD Cash,cash,18003.45,USD,,,,
+GBP Cash,cash,130.12,GBP,,,,
 ```
 
 Other import paths still exist for older Vanguard UK, Robinhood, and Interactive Investor exports, but the generic portfolio format is the format the current app model is built around.

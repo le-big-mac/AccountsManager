@@ -60,6 +60,7 @@ enum PortfolioImportService {
                 existing.sedol = h.sedol
                 existing.units = h.units
                 existing.priceCurrency = h.priceCurrency
+                existing.averagePurchasePrice = h.averagePurchasePrice
                 if let assetClass = h.assetClass {
                     existing.assetClass = assetClass
                 }
@@ -73,6 +74,7 @@ enum PortfolioImportService {
                     priceCurrency: h.priceCurrency,
                     assetClass: h.assetClass
                 )
+                holding.averagePurchasePrice = h.averagePurchasePrice
                 account.holdings.append(holding)
             }
         }

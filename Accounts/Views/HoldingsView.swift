@@ -143,16 +143,11 @@ struct HoldingRow: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                }
-                if let dailyChange = holding.dailyChange,
-                   let dailyChangePercent = holding.dailyChangePercent {
-                    HStack(spacing: 4) {
-                        Text(dailyChange.formattedCurrency(code: holding.priceCurrency))
+                    if let openPnLPercent = holding.openPnLPercent {
+                        Text(openPnLPercent.formattedPercent())
                             .font(.caption)
-                        Text(dailyChangePercent.formattedPercent())
-                            .font(.caption)
+                            .foregroundStyle(openPnLPercent < 0 ? Color.orange : (openPnLPercent > 0 ? Color.green : Color.secondary))
                     }
-                    .foregroundStyle(dailyChange < 0 ? Color.orange : (dailyChange > 0 ? Color.green : Color.secondary))
                 }
                 if let target = holding.analystConsensusTarget {
                     HStack(spacing: 4) {
