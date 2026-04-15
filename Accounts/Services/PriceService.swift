@@ -5,9 +5,13 @@ final class PriceService {
     static let shared = PriceService()
 
     private let stableBaseURL = "https://financialmodelingprep.com/stable"
+    private let alphaVantageBaseURL = "https://www.alphavantage.co/query"
     private var cache: [String: CachedQuote] = [:]
     private var fxCache: [String: CachedFXRate] = [:]
+    private var analystTargetCache: [String: CachedAnalystTarget] = [:]
     private var vanguardProductsCache: [VanguardProduct]?
+    private var analystTargetRefreshTask: Task<Void, Never>?
+    private var lastAlphaVantageRequestAt: Date?
 
     struct CachedQuote {
         let price: Decimal
@@ -19,6 +23,14 @@ final class PriceService {
 
     struct CachedFXRate {
         let rate: Decimal
+        let fetchedAt: Date
+    }
+
+    struct CachedAnalystTarget {
+        let consensus: Decimal?
+        let low: Decimal?
+        let high: Decimal?
+        let currency: String
         let fetchedAt: Date
     }
 
@@ -65,6 +77,10 @@ final class PriceService {
 
     private var apiKey: String? {
         KeychainHelper.load(.fmpApiKey)
+    }
+
+    private var alphaVantageApiKey: String? {
+        KeychainHelper.load(.alphaVantageApiKey)
     }
 
     var isConfigured: Bool {
@@ -195,6 +211,14 @@ final class PriceService {
                 continue
             }
         }
+        scheduleAnalystTargetRefresh(holdings)
+    }
+
+    func scheduleAnalystTargetRefresh(_ holdings: [Holding]) {
+        analystTargetRefreshTask?.cancel()
+        analystTargetRefreshTask = Task { @MainActor in
+            await refreshAnalystTargets(holdings)
+        }
     }
 
     func refreshHoldingFXRates(_ holdings: [Holding]) async {
@@ -207,6 +231,90 @@ final class PriceService {
                 continue
             }
         }
+    }
+
+    private func refreshAnalystTargets(_ holdings: [Holding]) async {
+        guard alphaVantageApiKey != nil else { return }
+
+        let eligibleHoldings = holdings.filter { holding in
+            supportsAnalystTargets(for: holding) && needsAnalystTargetRefresh(for: holding)
+        }
+
+        for holding in eligibleHoldings {
+            guard !Task.isCancelled else { return }
+            guard canUseAlphaVantageRequestBudget() else { return }
+            guard let ticker = holding.ticker else { continue }
+
+            do {
+                if let target = try await fetchAnalystTarget(ticker: ticker, currency: holding.priceCurrency) {
+                    holding.analystConsensusTarget = target.consensus
+                    holding.analystTargetLow = target.low
+                    holding.analystTargetHigh = target.high
+                    holding.analystTargetCurrency = target.currency
+                    holding.analystTargetUpdatedAt = Date()
+                } else {
+                    clearAnalystTarget(on: holding)
+                }
+            } catch {
+                if let priceError = error as? PriceError, priceError == .rateLimited {
+                    return
+                }
+                clearAnalystTarget(on: holding)
+            }
+        }
+    }
+
+    private func fetchAnalystTarget(ticker: String, currency: String) async throws -> CachedAnalystTarget? {
+        if let cached = analystTargetCache[ticker],
+           Date().timeIntervalSince(cached.fetchedAt) < 21_600 {
+            return cached
+        }
+
+        guard let alphaVantageApiKey else { throw PriceError.notConfigured }
+        try await respectAlphaVantageThrottle()
+
+        var components = URLComponents(string: alphaVantageBaseURL)!
+        components.queryItems = [
+            URLQueryItem(name: "function", value: "OVERVIEW"),
+            URLQueryItem(name: "symbol", value: ticker),
+            URLQueryItem(name: "apikey", value: alphaVantageApiKey)
+        ]
+        let url = components.url!
+        let (data, _) = try await URLSession.shared.data(from: url)
+
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw PriceError.noData
+        }
+
+        if object["Information"] != nil || object["Note"] != nil {
+            throw PriceError.rateLimited
+        }
+
+        let consensus = decimalString(object["AnalystTargetPrice"])
+        let low = decimalString(object["AnalystTargetLowPrice"])
+        let high = decimalString(object["AnalystTargetHighPrice"])
+        let responseCurrency = normalizedCurrency((object["Currency"] as? String) ?? currency)
+
+        guard consensus != nil || low != nil || high != nil else {
+            analystTargetCache[ticker] = CachedAnalystTarget(
+                consensus: nil,
+                low: nil,
+                high: nil,
+                currency: responseCurrency,
+                fetchedAt: Date()
+            )
+            return nil
+        }
+
+        let cached = CachedAnalystTarget(
+            consensus: consensus,
+            low: low,
+            high: high,
+            currency: responseCurrency,
+            fetchedAt: Date()
+        )
+        analystTargetCache[ticker] = cached
+        return cached
     }
 
     private func fetchVanguardQuote(for holding: Holding) async throws -> CachedQuote? {
@@ -295,6 +403,74 @@ final class PriceService {
     func clearCache() {
         cache.removeAll()
         fxCache.removeAll()
+        analystTargetCache.removeAll()
+    }
+
+    private func supportsAnalystTargets(for holding: Holding) -> Bool {
+        switch holding.assetClass {
+        case .stock, .etf:
+            return holding.ticker != nil
+        case .cash, .fund, .other:
+            return false
+        }
+    }
+
+    private func clearAnalystTarget(on holding: Holding) {
+        holding.analystConsensusTarget = nil
+        holding.analystTargetLow = nil
+        holding.analystTargetHigh = nil
+        holding.analystTargetCurrencyRaw = ""
+        holding.analystTargetUpdatedAt = nil
+    }
+
+    private func needsAnalystTargetRefresh(for holding: Holding) -> Bool {
+        guard let updatedAt = holding.analystTargetUpdatedAt else { return true }
+        return Date().timeIntervalSince(updatedAt) > 7 * 24 * 60 * 60
+    }
+
+    private func respectAlphaVantageThrottle() async throws {
+        let minimumInterval: TimeInterval = 12
+        if let lastAlphaVantageRequestAt {
+            let elapsed = Date().timeIntervalSince(lastAlphaVantageRequestAt)
+            if elapsed < minimumInterval {
+                let remaining = minimumInterval - elapsed
+                try await Task.sleep(for: .seconds(remaining))
+            }
+        }
+        lastAlphaVantageRequestAt = Date()
+    }
+
+    private func canUseAlphaVantageRequestBudget() -> Bool {
+        let defaults = UserDefaults.standard
+        let dayKey = "alphaVantage.requestDay"
+        let countKey = "alphaVantage.requestCount"
+        let today = alphaVantageDayString(for: Date())
+        let storedDay = defaults.string(forKey: dayKey)
+        var count = defaults.integer(forKey: countKey)
+
+        if storedDay != today {
+            defaults.set(today, forKey: dayKey)
+            count = 0
+        }
+
+        guard count < 25 else { return false }
+        defaults.set(count + 1, forKey: countKey)
+        return true
+    }
+
+    private func alphaVantageDayString(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    private func decimalString(_ value: Any?) -> Decimal? {
+        guard let value = value as? String else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != "None" else { return nil }
+        return Decimal(string: trimmed)
     }
 
     private func normalizedCurrency(_ currency: String) -> String {

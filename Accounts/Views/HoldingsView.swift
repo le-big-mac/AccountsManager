@@ -144,6 +144,18 @@ struct HoldingRow: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                if let target = holding.analystConsensusTarget {
+                    HStack(spacing: 4) {
+                        Text("Target \(target.formattedCurrency(code: holding.analystTargetCurrency))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if let upside = holding.analystConsensusUpsidePercent {
+                            Text(upside.formattedPercent())
+                                .font(.caption)
+                                .foregroundStyle(upside < 0 ? Color.orange : Color.green)
+                        }
+                    }
+                }
             }
 
             Spacer()

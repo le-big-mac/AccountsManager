@@ -24,9 +24,27 @@ enum PortfolioImportService {
         _ = try? importCSV(at: URL(fileURLWithPath: path), into: account, rememberSource: true)
     }
 
-    static func importSnapshot(_ parsed: CSVParser.ParsedCSV, into account: Account) {
-        importHoldings(parsed.holdings, into: account)
-        importCashBalances(parsed.cashBalances, into: account)
+    static func importSnapshot(
+        _ parsed: CSVParser.ParsedCSV,
+        into account: Account,
+        cashFirst: Bool = false,
+        preserveExistingCashWhenEmpty: Bool = false
+    ) {
+        if cashFirst {
+            importCashBalances(
+                parsed.cashBalances,
+                into: account,
+                preserveExistingWhenEmpty: preserveExistingCashWhenEmpty
+            )
+            importHoldings(parsed.holdings, into: account)
+        } else {
+            importHoldings(parsed.holdings, into: account)
+            importCashBalances(
+                parsed.cashBalances,
+                into: account,
+                preserveExistingWhenEmpty: preserveExistingCashWhenEmpty
+            )
+        }
     }
 
     private static func importHoldings(_ holdings: [ParsedHolding], into account: Account) {
@@ -64,7 +82,15 @@ enum PortfolioImportService {
         }
     }
 
-    private static func importCashBalances(_ cashBalances: [ParsedCashBalance], into account: Account) {
+    private static func importCashBalances(
+        _ cashBalances: [ParsedCashBalance],
+        into account: Account,
+        preserveExistingWhenEmpty: Bool = false
+    ) {
+        if preserveExistingWhenEmpty && cashBalances.isEmpty {
+            return
+        }
+
         let activeKeys = Set(cashBalances.map(cashKey))
 
         for cash in cashBalances {
