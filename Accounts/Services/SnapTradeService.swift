@@ -147,7 +147,6 @@ final class SnapTradeService {
         guard (200..<300).contains(status) else {
             let message = String(data: data, encoding: .utf8) ?? "HTTP \(status)"
             DebugLog.write("SnapTrade request failed status=\(status) method=\(method) path=\(path)")
-            DebugLog.write("SnapTrade signature payload=\(signaturePayload)")
             throw SnapTradeError.api(message)
         }
 

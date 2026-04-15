@@ -20,7 +20,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func handleURL(_ event: NSAppleEventDescriptor, withReply reply: NSAppleEventDescriptor) {
         let urlString = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue ?? "nil"
-        DebugLog.write("URL callback received: \(urlString)")
 
         guard let url = URL(string: urlString),
               url.scheme == "accounts" else {
@@ -41,7 +40,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             DebugLog.write("URL callback parsing failed")
             return
         }
-        DebugLog.write("Parsed code=\(code.prefix(20))... state=\(state.prefix(12))...")
         AppState.shared.trueLayerCallback = (code: code, state: state)
     }
 }

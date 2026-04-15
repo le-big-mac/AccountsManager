@@ -239,10 +239,8 @@ struct BankConnectionView: View {
 
     private func handleAuthCode(_ code: String) async {
         do {
-            log("Exchanging code: \(code.prefix(30))...")
             let tokenPair = try await TrueLayerService.shared.exchangeCode(code)
             self.accessToken = tokenPair.accessToken
-            log("Got access token: \(tokenPair.accessToken.prefix(20))...")
 
             // Store refresh token on this specific account
             guard let refresh = tokenPair.refreshToken else {

@@ -388,10 +388,6 @@ actor TrueLayerService {
         let requestId = httpResponse.value(forHTTPHeaderField: "x-request-id") ?? "nil"
         let cacheControl = httpResponse.value(forHTTPHeaderField: "cache-control") ?? "nil"
         DebugLog.write("TrueLayer \(name): status=\(httpResponse.statusCode) bytes=\(data.count) requestId=\(requestId) cacheControl=\(cacheControl)")
-
-        if let body = String(data: data, encoding: .utf8) {
-            DebugLog.write("TrueLayer \(name) body: \(body.prefix(4000))")
-        }
     }
 
     private func normalizedCurrency(_ currency: String?) -> String {
