@@ -71,11 +71,7 @@ struct AccountListView: View {
                                 .onTapGesture {
                                     selectedAccount = account
                                 }
-                                .draggable(account.id.uuidString) {
-                                    AccountRow(account: account)
-                                        .frame(width: 300, height: 58, alignment: .leading)
-                                        .padding(.horizontal, 8)
-                                }
+                                .draggable(account.id.uuidString)
                                 .dropDestination(for: String.self) { items, _ in
                                     guard let id = items.first,
                                           let dragged = accounts.first(where: { $0.id.uuidString == id }) else {
@@ -93,9 +89,14 @@ struct AccountListView: View {
                                     }
                                 }
                                 .simultaneousGesture(
-                                    DragGesture(minimumDistance: 2).onChanged { _ in
-                                        draggedAccount = account
-                                    }
+                                    DragGesture(minimumDistance: 2)
+                                        .onChanged { _ in
+                                            draggedAccount = account
+                                        }
+                                        .onEnded { _ in
+                                            draggedAccount = nil
+                                            dropTargetAccountID = nil
+                                        }
                                 )
                             .contextMenu {
                                 Button("Archive") {
