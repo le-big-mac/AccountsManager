@@ -129,10 +129,7 @@ final class Holding {
               averagePurchasePrice > 0 else {
             return nil
         }
-        let currentValue = units * price
-        guard currentValue > 0 else { return nil }
-        let costBasis = units * averagePurchasePrice
-        return (currentValue - costBasis) / currentValue
+        return (price - averagePurchasePrice) / averagePurchasePrice
     }
 
     private var inferredPriceCurrency: String {
