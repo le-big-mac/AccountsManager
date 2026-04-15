@@ -25,8 +25,15 @@ struct AccountDetailView: View {
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Text(account.currentBalance.formattedGBP())
-                        .font(.system(.title, design: .rounded, weight: .bold))
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text(account.currentBalance.formattedGBP())
+                            .font(.system(.title, design: .rounded, weight: .bold))
+                        if let breakdown = account.originalCurrencyBreakdownText {
+                            Text(breakdown)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
 
                 Divider()

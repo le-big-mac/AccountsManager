@@ -26,6 +26,12 @@ struct AccountRow: View {
                 Text(account.currentBalance.formattedGBP())
                     .font(.system(.body, design: .rounded, weight: .semibold))
 
+                if let breakdown = account.originalCurrencyBreakdownText {
+                    Text(breakdown)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
                 Text(account.accountType == .bankAccount ? "sync" : "live")
                     .font(.caption2)
                     .foregroundStyle(account.accountType == .bankAccount ? .blue : .green)

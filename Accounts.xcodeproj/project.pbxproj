@@ -33,6 +33,7 @@
 		BAF586B34FEA24F77834E427 /* AccountsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 449443F0B28305AE02FD33AA /* AccountsApp.swift */; };
 		C2C3F2A4F24ECE21A4BB32EB /* CombinedAccountsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14DE8542C338C85A5E54D454 /* CombinedAccountsView.swift */; };
 		CA0C2151A0804865530C59D0 /* AccountListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73EE97A01ED4C0AFE54F35C0 /* AccountListView.swift */; };
+		CE91C4855C86256DDFC2515D /* CurrencyBreakdown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02E9EB6462D366A7187FC522 /* CurrencyBreakdown.swift */; };
 		E5CF52EFD6214993922473A8 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF46D2736D4A4C46B235F631 /* SettingsView.swift */; };
 		E87879BDF44A293F8FBE57BA /* HoldingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F12746F64FCA0F94741647E /* HoldingsView.swift */; };
 		F1215986865D405E5E733723 /* SnapTradeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D73B845156C7C869C6FADC54 /* SnapTradeService.swift */; };
@@ -49,6 +50,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		02E9EB6462D366A7187FC522 /* CurrencyBreakdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyBreakdown.swift; sourceTree = "<group>"; };
 		0CFA8BB7B20E44EE99B0C959 /* AppIcon.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = AppIcon.icns; sourceTree = "<group>"; };
 		14DE8542C338C85A5E54D454 /* CombinedAccountsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CombinedAccountsView.swift; sourceTree = "<group>"; };
 		316322C6E474FE63E874E3A5 /* Account.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Account.swift; sourceTree = "<group>"; };
@@ -150,6 +152,7 @@
 		B2AD4CB56FE288F6209F1219 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				02E9EB6462D366A7187FC522 /* CurrencyBreakdown.swift */,
 				B21077A481D080A9254D3F61 /* DebugLog.swift */,
 				3585AD9ECBA052514E1E6205 /* DecimalFormatting.swift */,
 				B701FC9C9D31399B14C55D82 /* PersistentStoreBackup.swift */,
@@ -290,6 +293,7 @@
 				ACB170876047BA494F3AC735 /* CSVParser.swift in Sources */,
 				7F31D169B5D378DCCBD8445A /* CashBalance.swift in Sources */,
 				C2C3F2A4F24ECE21A4BB32EB /* CombinedAccountsView.swift in Sources */,
+				CE91C4855C86256DDFC2515D /* CurrencyBreakdown.swift in Sources */,
 				09FD838D8FB2C21092F323C1 /* DebugLog.swift in Sources */,
 				9069852949C792B157A6FD75 /* DecimalFormatting.swift in Sources */,
 				56F1E5C986024661AA0F50CF /* Holding.swift in Sources */,

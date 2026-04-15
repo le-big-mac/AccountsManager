@@ -15,6 +15,25 @@ extension Decimal {
         formattedCurrency(code: "GBP")
     }
 
+    func formattedCurrencyBreakdown(code: String) -> String {
+        let normalizedCode = code.uppercased()
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = Locale(identifier: "en_GB")
+        formatter.maximumFractionDigits = 2
+        formatter.minimumFractionDigits = 2
+
+        let number = formatter.string(from: self as NSDecimalNumber) ?? "\(self)"
+        switch normalizedCode {
+        case "GBP":
+            return "GB£\(number)"
+        case "USD":
+            return "US$\(number)"
+        default:
+            return "\(normalizedCode) \(number)"
+        }
+    }
+
     func formattedCompact() -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
