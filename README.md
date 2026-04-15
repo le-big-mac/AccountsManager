@@ -128,13 +128,40 @@ The repo ignores local credentials, logs, and store files via `.gitignore`.
 
 CSV-backed investment accounts are intended to use one file per account as the persistent source of truth.
 
-At a high level:
+Current preferred format is a generic portfolio CSV with one header row and one row per holding or cash balance.
 
-- holdings are imported into the account
-- cash lines are supported
-- prices are refreshed separately from FMP
+Expected columns:
 
-The current parser is built around the app's account import flow rather than a public CSV spec document, so if the format changes, inspect:
+- `name`
+- `assetClass`
+- `units`
+- `currency`
+- optional `ticker`
+- optional `isin`
+- optional `sedol`
+
+Rules:
+
+- `assetClass` should be one of `cash`, `stock`, `etf`, or `fund`
+- non-cash rows become holdings
+- `cash` rows become cash balances
+- for cash rows, the amount is stored in `units`
+- `currency` is the holding price currency or the cash currency
+- `ticker`, `isin`, and `sedol` are optional, but at least one identifier is useful for live pricing
+
+Example:
+
+```csv
+name,assetClass,units,currency,ticker,isin,sedol
+FTSE Global All Cap Index Fund Accumulation,fund,36.9627,GBP,VAFTGAG,GB00BD3RZ582,
+Apple Inc,stock,12,USD,AAPL,US0378331005,
+USD Cash,cash,18003.45,USD,,,
+GBP Cash,cash,130.12,GBP,,,
+```
+
+Other import paths still exist for older Vanguard UK, Robinhood, and Interactive Investor exports, but the generic portfolio format is the format the current app model is built around.
+
+If the format changes in future, inspect:
 
 - `Accounts/Services/CSVParser.swift`
 - `Accounts/Services/PortfolioImportService.swift`
@@ -146,7 +173,6 @@ The current parser is built around the app's account import flow rather than a p
 - `Accounts/Services/` - TrueLayer, SnapTrade, pricing, CSV import, syncing
 - `Accounts/Views/` - SwiftUI screens
 - `Accounts/Utilities/` - formatting, debug logging, store backup
-- `AccountsTests/` - unit tests
 
 ## Notes
 

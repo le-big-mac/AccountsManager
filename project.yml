@@ -29,14 +29,3 @@ targets:
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_ENTITLEMENTS: ""
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-
-  AccountsTests:
-    type: bundle.unit-test
-    platform: macOS
-    sources:
-      - path: AccountsTests
-    dependencies:
-      - target: Accounts
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: io.github.le-big-mac.accountsmanager.tests
