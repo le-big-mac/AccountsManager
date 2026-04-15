@@ -48,10 +48,21 @@ struct AccountListView: View {
                 .padding(.horizontal, 8)
                 .padding(.top, 8)
 
-                List(selection: $selectedAccount) {
-                    ForEach(accounts) { account in
-                        AccountRow(account: account)
-                            .tag(account)
+                ScrollView {
+                    LazyVStack(spacing: 4) {
+                        ForEach(accounts) { account in
+                            Button {
+                                selectedAccount = account
+                            } label: {
+                                AccountRow(account: account)
+                                    .frame(maxWidth: .infinity, minHeight: 58, maxHeight: 58, alignment: .leading)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .contentShape(Rectangle())
+                                    .background(selectedAccount == account ? Color.accentColor.opacity(0.14) : Color.clear)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            .buttonStyle(.plain)
                             .onDrag {
                                 draggedAccount = account
                                 return NSItemProvider(object: account.id.uuidString as NSString)
@@ -74,8 +85,10 @@ struct AccountListView: View {
                                     accountPendingDeletion = account
                                 }
                             }
+                        }
                     }
-                    .onMove(perform: moveAccounts)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
                 }
 
                 Divider()
@@ -176,12 +189,6 @@ struct AccountListView: View {
         } message: { account in
             Text("This removes \(account.name), including holdings, balances, and connection tokens.")
         }
-    }
-
-    private func moveAccounts(from source: IndexSet, to destination: Int) {
-        var reordered = accounts
-        reordered.move(fromOffsets: source, toOffset: destination)
-        applySortOrder(to: reordered)
     }
 
     private func normalizeSortOrderIfNeeded() {
