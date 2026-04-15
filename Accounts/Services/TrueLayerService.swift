@@ -218,8 +218,13 @@ actor TrueLayerService {
         try validateHTTPResponse(response, data: data)
         let transactionsResponse = try JSONDecoder().decode(TransactionsResponse.self, from: data)
         return transactionsResponse.results.map { transaction in
-            TransactionSnapshot(
-                id: transaction.transactionId ?? "\(accountId):\(transaction.timestamp ?? ""):\(transaction.description ?? ""):\(transaction.amount?.description ?? "")",
+            let stableID =
+                transaction.normalisedProviderTransactionId ??
+                transaction.providerTransactionId ??
+                transaction.transactionId ??
+                "\(accountId):\(transaction.timestamp ?? ""):\(transaction.description ?? ""):\(transaction.amount?.description ?? "")"
+            return TransactionSnapshot(
+                id: stableID,
                 accountId: accountId,
                 date: Self.parseDate(transaction.timestamp) ?? Date(),
                 description: transaction.description ?? transaction.merchantName ?? "Transaction",
@@ -352,6 +357,8 @@ actor TrueLayerService {
 
     struct TransactionResult: Decodable {
         let transactionId: String?
+        let providerTransactionId: String?
+        let normalisedProviderTransactionId: String?
         let timestamp: String?
         let description: String?
         let merchantName: String?
@@ -360,6 +367,8 @@ actor TrueLayerService {
 
         enum CodingKeys: String, CodingKey {
             case transactionId = "transaction_id"
+            case providerTransactionId = "provider_transaction_id"
+            case normalisedProviderTransactionId = "normalised_provider_transaction_id"
             case timestamp
             case description
             case merchantName = "merchant_name"

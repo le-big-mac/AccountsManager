@@ -44,11 +44,14 @@ enum BankSyncService {
                 ))
             }
 
-            if let transactions = try? await TrueLayerService.shared.fetchTransactions(
-                accountId: id,
-                accessToken: accessToken
-            ) {
+            do {
+                let transactions = try await TrueLayerService.shared.fetchTransactions(
+                    accountId: id,
+                    accessToken: accessToken
+                )
                 mergeTransactions(transactions, into: account)
+            } catch {
+                DebugLog.write("TrueLayer transactions sync failed for \(id.prefix(8)): \(error.localizedDescription)")
             }
         }
 
@@ -64,7 +67,17 @@ enum BankSyncService {
         into account: Account
     ) {
         for transaction in transactions {
-            if let existing = account.bankTransactions.first(where: { $0.trueLayerTransactionId == transaction.id }) {
+            if let existing = account.bankTransactions.first(where: {
+                ($0.trueLayerTransactionId == transaction.id && $0.trueLayerAccountId == transaction.accountId) ||
+                    (
+                        $0.trueLayerAccountId == transaction.accountId &&
+                            $0.date == transaction.date &&
+                            $0.amount == transaction.amount &&
+                            $0.descriptionText == transaction.description &&
+                            $0.currency == transaction.currency
+                    )
+            }) {
+                existing.trueLayerTransactionId = transaction.id
                 existing.trueLayerAccountId = transaction.accountId
                 existing.date = transaction.date
                 existing.descriptionText = transaction.description
@@ -83,7 +96,7 @@ enum BankSyncService {
         }
 
         let sorted = account.bankTransactions.sorted { $0.date > $1.date }
-        let retainedIds = Set(sorted.prefix(50).map(\.id))
+        let retainedIds = Set(sorted.prefix(200).map(\.id))
         account.bankTransactions.removeAll { !retainedIds.contains($0.id) }
     }
 
