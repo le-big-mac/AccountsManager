@@ -38,6 +38,7 @@ struct AccountListView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
+                    .contentShape(Rectangle())
                     .background(selectedAccount == nil ? Color.accentColor.opacity(0.14) : Color.clear)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
