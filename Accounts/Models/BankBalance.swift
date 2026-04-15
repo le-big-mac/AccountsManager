@@ -36,6 +36,20 @@ final class BankBalance {
         }
     }
 
+    var effectiveDisplayName: String {
+        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = trimmed.split(separator: " ")
+
+        if parts.count == 2,
+           parts[0].uppercased() == currency,
+           parts[1].count == 6,
+           parts[1].allSatisfy(\.isHexDigit) {
+            return "\(currency) Balance"
+        }
+
+        return trimmed.isEmpty ? "\(currency) Balance" : trimmed
+    }
+
     init(
         trueLayerAccountId: String,
         displayName: String,

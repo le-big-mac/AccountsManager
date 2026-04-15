@@ -131,7 +131,7 @@ struct AccountDetailView: View {
 
             let sorted = account.bankBalances.sorted { lhs, rhs in
                 if lhs.currency == rhs.currency {
-                    return lhs.displayName < rhs.displayName
+                    return lhs.effectiveDisplayName < rhs.effectiveDisplayName
                 }
                 return lhs.currency < rhs.currency
             }
@@ -143,7 +143,7 @@ struct AccountDetailView: View {
                 ForEach(sorted, id: \.id) { balance in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(balance.displayName)
+                            Text(balance.effectiveDisplayName)
                                 .font(.subheadline)
                             Text("Updated \(balance.updatedAt.relativeFormatted())")
                                 .font(.caption)
