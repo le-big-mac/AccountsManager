@@ -4,6 +4,8 @@ import SwiftData
 struct AddAccountSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Query(sort: \Account.sortOrder)
+    private var existingAccounts: [Account]
 
     var onAccountCreated: (Account) -> Void = { _ in }
 
@@ -68,7 +70,7 @@ struct AddAccountSheet: View {
 
     private func addAccount() {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let account = Account(name: trimmedName, accountType: accountType)
+        let account = Account(name: trimmedName, accountType: accountType, sortOrder: nextSortOrder)
         if accountType == .bankAccount {
             // Don't insert yet -- wait for successful connection
             pendingAccount = account
@@ -79,5 +81,9 @@ struct AddAccountSheet: View {
             onAccountCreated(account)
             dismiss()
         }
+    }
+
+    private var nextSortOrder: Int {
+        (existingAccounts.map(\.sortOrder).max() ?? 0) + 10
     }
 }

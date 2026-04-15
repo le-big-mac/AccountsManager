@@ -46,17 +46,33 @@ struct AccountListView: View {
                 .padding(.horizontal, 8)
                 .padding(.top, 8)
 
-                List(accounts, selection: $selectedAccount) { account in
-                    AccountRow(account: account)
-                        .tag(account)
-                        .contextMenu {
-                            Button("Archive") {
-                                account.isArchived = true
+                List(selection: $selectedAccount) {
+                    ForEach(accounts) { account in
+                        AccountRow(account: account)
+                            .tag(account)
+                            .contextMenu {
+                                Button("Move Up") {
+                                    moveAccount(account, by: -1)
+                                }
+                                .disabled(isFirstAccount(account))
+
+                                Button("Move Down") {
+                                    moveAccount(account, by: 1)
+                                }
+                                .disabled(isLastAccount(account))
+
+                                Divider()
+
+                                Button("Archive") {
+                                    account.isArchived = true
+                                    normalizeSortOrder()
+                                }
+                                Button("Delete", role: .destructive) {
+                                    accountPendingDeletion = account
+                                }
                             }
-                            Button("Delete", role: .destructive) {
-                                accountPendingDeletion = account
-                            }
-                        }
+                    }
+                    .onMove(perform: moveAccounts)
                 }
 
                 Divider()
@@ -132,6 +148,9 @@ struct AccountListView: View {
         .sheet(isPresented: $showingSettings) {
             SettingsView()
         }
+        .onAppear {
+            normalizeSortOrderIfNeeded()
+        }
         .alert(
             "Delete Account?",
             isPresented: Binding(
@@ -145,6 +164,7 @@ struct AccountListView: View {
                     selectedAccount = nil
                 }
                 modelContext.delete(account)
+                normalizeSortOrder()
                 accountPendingDeletion = nil
             }
             Button("Cancel", role: .cancel) {
@@ -152,6 +172,46 @@ struct AccountListView: View {
             }
         } message: { account in
             Text("This removes \(account.name), including holdings, balances, and connection tokens.")
+        }
+    }
+
+    private func moveAccounts(from source: IndexSet, to destination: Int) {
+        var reordered = accounts
+        reordered.move(fromOffsets: source, toOffset: destination)
+        applySortOrder(to: reordered)
+    }
+
+    private func moveAccount(_ account: Account, by offset: Int) {
+        guard let index = accounts.firstIndex(of: account) else { return }
+        let targetIndex = index + offset
+        guard accounts.indices.contains(targetIndex) else { return }
+
+        var reordered = accounts
+        reordered.swapAt(index, targetIndex)
+        applySortOrder(to: reordered)
+    }
+
+    private func isFirstAccount(_ account: Account) -> Bool {
+        accounts.first == account
+    }
+
+    private func isLastAccount(_ account: Account) -> Bool {
+        accounts.last == account
+    }
+
+    private func normalizeSortOrderIfNeeded() {
+        let orders = accounts.map(\.sortOrder)
+        guard Set(orders).count != orders.count || orders.contains(0) else { return }
+        normalizeSortOrder()
+    }
+
+    private func normalizeSortOrder() {
+        applySortOrder(to: accounts)
+    }
+
+    private func applySortOrder(to orderedAccounts: [Account]) {
+        for (index, account) in orderedAccounts.enumerated() {
+            account.sortOrder = (index + 1) * 10
         }
     }
 
