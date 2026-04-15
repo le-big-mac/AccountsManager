@@ -60,7 +60,7 @@ Supported credentials:
 
 ## Build
 
-Generate the Xcode project:
+The checked-in source of truth is `project.yml`. Generate the Xcode project first:
 
 ```sh
 xcodegen generate
