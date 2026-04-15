@@ -453,7 +453,7 @@ final class PriceService {
             count = 0
         }
 
-        guard count < 20 else { return false }
+        guard count < 25 else { return false }
         defaults.set(count + 1, forKey: countKey)
         return true
     }
