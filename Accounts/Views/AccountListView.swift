@@ -72,6 +72,7 @@ struct AccountListView: View {
                 .padding(.vertical, 10)
             }
             .navigationTitle("Accounts")
+            .navigationSplitViewColumnWidth(min: 320, ideal: 360, max: 460)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {

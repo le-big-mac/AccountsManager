@@ -69,6 +69,6 @@ struct AccountsApp: App {
                 .modelContainer(modelContainer)
                 .environment(AppState.shared)
         }
-        .defaultSize(width: 750, height: 500)
+        .defaultSize(width: 1100, height: 700)
     }
 }
