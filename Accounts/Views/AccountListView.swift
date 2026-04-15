@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import UniformTypeIdentifiers
 
 struct AccountListView: View {
     @Query(filter: #Predicate<Account> { !$0.isArchived },
@@ -51,31 +50,40 @@ struct AccountListView: View {
                 ScrollView {
                     LazyVStack(spacing: 4) {
                         ForEach(accounts) { account in
-                            Button {
-                                selectedAccount = account
-                            } label: {
-                                AccountRow(account: account)
-                                    .frame(maxWidth: .infinity, minHeight: 58, maxHeight: 58, alignment: .leading)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .contentShape(Rectangle())
-                                    .background(selectedAccount == account ? Color.accentColor.opacity(0.14) : Color.clear)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                            .buttonStyle(.plain)
-                            .onDrag {
-                                draggedAccount = account
-                                return NSItemProvider(object: account.id.uuidString as NSString)
-                            }
-                            .onDrop(
-                                of: [.text],
-                                delegate: AccountDropDelegate(
-                                    targetAccount: account,
-                                    accounts: accounts,
-                                    draggedAccount: $draggedAccount,
-                                    applySortOrder: applySortOrder
+                            AccountRow(account: account)
+                                .frame(maxWidth: .infinity, minHeight: 58, maxHeight: 58, alignment: .leading)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .contentShape(Rectangle())
+                                .background(selectedAccount == account ? Color.accentColor.opacity(0.14) : Color.clear)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .opacity(draggedAccount == account ? 0.45 : 1)
+                                .onTapGesture {
+                                    selectedAccount = account
+                                }
+                                .draggable(account.id.uuidString) {
+                                    AccountRow(account: account)
+                                        .frame(width: 300, height: 58, alignment: .leading)
+                                        .padding(.horizontal, 8)
+                                }
+                                .dropDestination(for: String.self) { items, _ in
+                                    guard let id = items.first,
+                                          let dragged = accounts.first(where: { $0.id.uuidString == id }) else {
+                                        return false
+                                    }
+                                    moveAccount(dragged, before: account)
+                                    draggedAccount = nil
+                                    return true
+                                } isTargeted: { targeted in
+                                    if targeted {
+                                        draggedAccount = draggedAccount ?? nil
+                                    }
+                                }
+                                .simultaneousGesture(
+                                    DragGesture(minimumDistance: 2).onChanged { _ in
+                                        draggedAccount = account
+                                    }
                                 )
-                            )
                             .contextMenu {
                                 Button("Archive") {
                                     account.isArchived = true
@@ -201,6 +209,21 @@ struct AccountListView: View {
         applySortOrder(to: accounts)
     }
 
+    private func moveAccount(_ dragged: Account, before target: Account) {
+        guard dragged != target,
+              let fromIndex = accounts.firstIndex(of: dragged),
+              let toIndex = accounts.firstIndex(of: target) else {
+            return
+        }
+
+        var reordered = accounts
+        reordered.move(
+            fromOffsets: IndexSet(integer: fromIndex),
+            toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex
+        )
+        applySortOrder(to: reordered)
+    }
+
     private func applySortOrder(to orderedAccounts: [Account]) {
         for (index, account) in orderedAccounts.enumerated() {
             account.sortOrder = (index + 1) * 10
@@ -242,37 +265,5 @@ struct AccountListView: View {
                 continue
             }
         }
-    }
-}
-
-private struct AccountDropDelegate: DropDelegate {
-    let targetAccount: Account
-    let accounts: [Account]
-    @Binding var draggedAccount: Account?
-    let applySortOrder: ([Account]) -> Void
-
-    func dropEntered(info: DropInfo) {
-        guard let draggedAccount,
-              draggedAccount != targetAccount,
-              let fromIndex = accounts.firstIndex(of: draggedAccount),
-              let toIndex = accounts.firstIndex(of: targetAccount) else {
-            return
-        }
-
-        var reordered = accounts
-        reordered.move(
-            fromOffsets: IndexSet(integer: fromIndex),
-            toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex
-        )
-        applySortOrder(reordered)
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        draggedAccount = nil
-        return true
     }
 }
