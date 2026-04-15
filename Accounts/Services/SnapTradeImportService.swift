@@ -12,8 +12,23 @@ enum SnapTradeImportService {
         }
 
         let response = try await SnapTradeService.shared.holdings(accountId: accountId)
-        importHoldings(response.positions ?? [], into: account)
-        importCashBalances(response.balances ?? [], into: account)
+        let positions = response.positions ?? []
+        let balances = response.balances ?? []
+        let parsedHoldings = parsedHoldings(from: positions)
+        let parsedCashBalances = parsedCashBalances(from: balances)
+
+        PortfolioImportService.importSnapshot(
+            CSVParser.ParsedCSV(
+                headers: [],
+                rows: [],
+                detectedFormat: .unknown,
+                holdings: parsedHoldings,
+                cashBalances: parsedCashBalances
+            ),
+            into: account
+        )
+
+        updateHoldingPrices(from: positions, in: account)
         account.snapTradeSyncedAt = Date()
 
         if let snapTradeAccount = response.account {
@@ -25,8 +40,8 @@ enum SnapTradeImportService {
         await PriceService.shared.refreshCashBalances(account.cashBalances)
     }
 
-    static func importHoldings(_ positions: [SnapTradePosition], into account: Account) {
-        let mapped = positions.compactMap { position -> ParsedHolding? in
+    private static func parsedHoldings(from positions: [SnapTradePosition]) -> [ParsedHolding] {
+        positions.compactMap { position -> ParsedHolding? in
             guard position.cashEquivalent != true else { return nil }
             let units = position.fractionalUnits ?? position.units ?? 0
             guard units != 0 else { return nil }
@@ -46,18 +61,9 @@ enum SnapTradeImportService {
                 assetClass: HoldingAssetClass.from(name) ?? .stock
             )
         }
+    }
 
-        PortfolioImportService.importSnapshot(
-            CSVParser.ParsedCSV(
-                headers: [],
-                rows: [],
-                detectedFormat: .unknown,
-                holdings: mapped,
-                cashBalances: []
-            ),
-            into: account
-        )
-
+    private static func updateHoldingPrices(from positions: [SnapTradePosition], in account: Account) {
         for holding in account.holdings {
             guard let position = positions.first(where: { ($0.symbol?.symbol?.symbol ?? $0.symbol?.symbol?.rawSymbol) == holding.ticker }),
                   let price = position.price else { continue }
@@ -67,33 +73,12 @@ enum SnapTradeImportService {
         }
     }
 
-    static func importCashBalances(_ balances: [SnapTradeBalance], into account: Account) {
-        let cashBalances = balances.compactMap { balance -> ParsedCashBalance? in
+    private static func parsedCashBalances(from balances: [SnapTradeBalance]) -> [ParsedCashBalance] {
+        balances.compactMap { balance -> ParsedCashBalance? in
             guard let cash = balance.cash,
                   cash != 0 else { return nil }
             let currency = balance.currency?.code ?? "USD"
             return ParsedCashBalance(name: "\(currency) Cash", amount: cash, currency: currency)
         }
-
-        PortfolioImportService.importSnapshot(
-            CSVParser.ParsedCSV(
-                headers: [],
-                rows: [],
-                detectedFormat: .unknown,
-                holdings: account.holdings.map {
-                    ParsedHolding(
-                        name: $0.name,
-                        ticker: $0.ticker,
-                        isin: $0.isin,
-                        sedol: $0.sedol,
-                        units: $0.units,
-                        priceCurrency: $0.priceCurrency,
-                        assetClass: $0.assetClass
-                    )
-                },
-                cashBalances: cashBalances
-            ),
-            into: account
-        )
     }
 }
