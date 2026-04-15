@@ -32,6 +32,7 @@ struct ParsedCashBalance {
     let name: String
     let amount: Decimal
     let currency: String
+    let fxRateToGBP: Decimal?
 }
 
 struct CSVParser {
@@ -192,7 +193,7 @@ struct CSVParser {
 
             let currency = value(row, at: currencyIdx).flatMap(nonEmpty) ?? "GBP"
             let name = value(row, at: nameIdx).flatMap(nonEmpty) ?? "\(currency) Cash"
-            return ParsedCashBalance(name: name, amount: amount, currency: currency)
+            return ParsedCashBalance(name: name, amount: amount, currency: currency, fxRateToGBP: nil)
         }
     }
 

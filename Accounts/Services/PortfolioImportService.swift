@@ -72,12 +72,17 @@ enum PortfolioImportService {
                 existing.name = cash.name
                 existing.amount = cash.amount
                 existing.currency = cash.currency
+                if let fxRate = cash.fxRateToGBP {
+                    existing.fxRateToGBP = fxRate
+                    existing.fxRateDate = Date()
+                }
                 existing.updatedAt = Date()
             } else {
                 account.cashBalances.append(CashBalance(
                     name: cash.name,
                     amount: cash.amount,
-                    currency: cash.currency
+                    currency: cash.currency,
+                    fxRateToGBP: cash.fxRateToGBP
                 ))
             }
         }

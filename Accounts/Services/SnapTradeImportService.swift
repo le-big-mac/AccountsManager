@@ -15,7 +15,7 @@ enum SnapTradeImportService {
         let positions = response.positions ?? []
         let balances = response.balances ?? []
         let parsedHoldings = parsedHoldings(from: positions)
-        let parsedCashBalances = parsedCashBalances(from: balances)
+        let parsedCashBalances = await parsedCashBalances(from: balances)
 
         PortfolioImportService.importSnapshot(
             CSVParser.ParsedCSV(
@@ -73,12 +73,34 @@ enum SnapTradeImportService {
         }
     }
 
-    private static func parsedCashBalances(from balances: [SnapTradeBalance]) -> [ParsedCashBalance] {
-        balances.compactMap { balance -> ParsedCashBalance? in
+    private static func parsedCashBalances(from balances: [SnapTradeBalance]) async -> [ParsedCashBalance] {
+        var fxRates: [String: Decimal] = [:]
+        let currencies = Set(balances.compactMap { balance -> String? in
+            guard let cash = balance.cash, cash != 0 else { return nil }
+            return (balance.currency?.code ?? "USD").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        })
+
+        for currency in currencies {
+            switch currency {
+            case "GBP":
+                fxRates[currency] = 1
+            case "GBX":
+                fxRates[currency] = Decimal(string: "0.01") ?? 0.01
+            default:
+                fxRates[currency] = try? await PriceService.shared.fetchFXRateToGBP(from: currency)
+            }
+        }
+
+        return balances.compactMap { balance -> ParsedCashBalance? in
             guard let cash = balance.cash,
                   cash != 0 else { return nil }
-            let currency = balance.currency?.code ?? "USD"
-            return ParsedCashBalance(name: "\(currency) Cash", amount: cash, currency: currency)
+            let currency = (balance.currency?.code ?? "USD").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            return ParsedCashBalance(
+                name: "\(currency) Cash",
+                amount: cash,
+                currency: currency,
+                fxRateToGBP: fxRates[currency]
+            )
         }
     }
 }
