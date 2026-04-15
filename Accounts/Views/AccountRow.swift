@@ -35,11 +35,6 @@ struct AccountRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-
-                Text(account.accountType == .bankAccount ? "sync" : "live")
-                    .font(.caption2)
-                    .foregroundStyle(account.accountType == .bankAccount ? .blue : .green)
-                    .lineLimit(1)
             }
         }
         .padding(.vertical, 4)
