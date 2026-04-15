@@ -4,6 +4,7 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var fmpApiKey: String = KeychainHelper.load(.fmpApiKey) ?? ""
+    @State private var alphaVantageApiKey: String = KeychainHelper.load(.alphaVantageApiKey) ?? ""
     @State private var tlClientId: String = KeychainHelper.load(.trueLayerClientId) ?? ""
     @State private var tlClientSecret: String = KeychainHelper.load(.trueLayerClientSecret) ?? ""
     @State private var snapTradeClientId: String = KeychainHelper.load(.snapTradeClientId) ?? ""
@@ -15,6 +16,14 @@ struct SettingsView: View {
                 SecureField("API Key", text: $fmpApiKey)
                     .textFieldStyle(.roundedBorder)
                 Text("Get a free key at financialmodelingprep.com (250 requests/day)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Alpha Vantage (Analyst Targets)") {
+                SecureField("API Key", text: $alphaVantageApiKey)
+                    .textFieldStyle(.roundedBorder)
+                Text("Used for analyst target prices. Free tier is heavily rate-limited, so targets refresh gradually.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -40,7 +49,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 450, height: 430)
+        .frame(width: 450, height: 500)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -57,6 +66,9 @@ struct SettingsView: View {
     private func saveCredentials() {
         if !fmpApiKey.isEmpty {
             KeychainHelper.save(fmpApiKey, for: .fmpApiKey)
+        }
+        if !alphaVantageApiKey.isEmpty {
+            KeychainHelper.save(alphaVantageApiKey, for: .alphaVantageApiKey)
         }
         if !tlClientId.isEmpty {
             KeychainHelper.save(tlClientId, for: .trueLayerClientId)

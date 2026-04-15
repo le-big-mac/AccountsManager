@@ -25,7 +25,9 @@ enum SnapTradeImportService {
                 holdings: parsedHoldings,
                 cashBalances: parsedCashBalances
             ),
-            into: account
+            into: account,
+            cashFirst: true,
+            preserveExistingCashWhenEmpty: true
         )
 
         updateHoldingPrices(from: positions, in: account)
@@ -37,9 +39,7 @@ enum SnapTradeImportService {
         }
 
         await PriceService.shared.refreshHoldingFXRates(account.holdings)
-        for holding in account.holdings {
-            await PriceService.shared.refreshAnalystTarget(for: holding)
-        }
+        PriceService.shared.scheduleAnalystTargetRefresh(account.holdings)
         await PriceService.shared.refreshCashBalances(account.cashBalances)
     }
 

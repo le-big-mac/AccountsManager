@@ -152,7 +152,7 @@ struct HoldingRow: View {
                         if let upside = holding.analystConsensusUpsidePercent {
                             Text(upside.formattedPercent())
                                 .font(.caption)
-                                .foregroundStyle(upside < 0 ? Color.secondary : Color.green)
+                                .foregroundStyle(upside < 0 ? Color.orange : Color.green)
                         }
                     }
                 }

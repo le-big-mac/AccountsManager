@@ -3,6 +3,7 @@ import Foundation
 enum KeychainHelper {
     enum Key: String {
         case fmpApiKey = "com.accounts.fmp-api-key"
+        case alphaVantageApiKey = "com.accounts.alpha-vantage-api-key"
         case trueLayerClientId = "com.accounts.truelayer-client-id"
         case trueLayerClientSecret = "com.accounts.truelayer-client-secret"
         case trueLayerRefreshToken = "com.accounts.truelayer-refresh-token"
