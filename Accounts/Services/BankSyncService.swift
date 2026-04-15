@@ -89,12 +89,12 @@ enum BankSyncService {
 
     private static func displayName(
         for bankAccount: TrueLayerService.BankAccount?,
-        fallbackId: String,
+        fallbackId _: String,
         currency: String
     ) -> String {
         if let label = bankAccount?.label {
             return label
         }
-        return "\(currency) \(fallbackId.prefix(6))"
+        return "\(currency) Balance"
     }
 }
