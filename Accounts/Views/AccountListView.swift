@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 struct AccountListView: View {
     @Query(filter: #Predicate<Account> { !$0.isArchived },
@@ -16,6 +17,7 @@ struct AccountListView: View {
     @State private var selectedAccount: Account?
     @State private var accountPendingDeletion: Account?
     @State private var isRefreshing = false
+    @State private var draggedAccount: Account?
 
     private var grandTotal: Decimal {
         accounts.reduce(Decimal.zero) { $0 + $1.currentBalance }
@@ -50,19 +52,20 @@ struct AccountListView: View {
                     ForEach(accounts) { account in
                         AccountRow(account: account)
                             .tag(account)
+                            .onDrag {
+                                draggedAccount = account
+                                return NSItemProvider(object: account.id.uuidString as NSString)
+                            }
+                            .onDrop(
+                                of: [.text],
+                                delegate: AccountDropDelegate(
+                                    targetAccount: account,
+                                    accounts: accounts,
+                                    draggedAccount: $draggedAccount,
+                                    applySortOrder: applySortOrder
+                                )
+                            )
                             .contextMenu {
-                                Button("Move Up") {
-                                    moveAccount(account, by: -1)
-                                }
-                                .disabled(isFirstAccount(account))
-
-                                Button("Move Down") {
-                                    moveAccount(account, by: 1)
-                                }
-                                .disabled(isLastAccount(account))
-
-                                Divider()
-
                                 Button("Archive") {
                                     account.isArchived = true
                                     normalizeSortOrder()
@@ -181,24 +184,6 @@ struct AccountListView: View {
         applySortOrder(to: reordered)
     }
 
-    private func moveAccount(_ account: Account, by offset: Int) {
-        guard let index = accounts.firstIndex(of: account) else { return }
-        let targetIndex = index + offset
-        guard accounts.indices.contains(targetIndex) else { return }
-
-        var reordered = accounts
-        reordered.swapAt(index, targetIndex)
-        applySortOrder(to: reordered)
-    }
-
-    private func isFirstAccount(_ account: Account) -> Bool {
-        accounts.first == account
-    }
-
-    private func isLastAccount(_ account: Account) -> Bool {
-        accounts.last == account
-    }
-
     private func normalizeSortOrderIfNeeded() {
         let orders = accounts.map(\.sortOrder)
         guard Set(orders).count != orders.count || orders.contains(0) else { return }
@@ -250,5 +235,37 @@ struct AccountListView: View {
                 continue
             }
         }
+    }
+}
+
+private struct AccountDropDelegate: DropDelegate {
+    let targetAccount: Account
+    let accounts: [Account]
+    @Binding var draggedAccount: Account?
+    let applySortOrder: ([Account]) -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard let draggedAccount,
+              draggedAccount != targetAccount,
+              let fromIndex = accounts.firstIndex(of: draggedAccount),
+              let toIndex = accounts.firstIndex(of: targetAccount) else {
+            return
+        }
+
+        var reordered = accounts
+        reordered.move(
+            fromOffsets: IndexSet(integer: fromIndex),
+            toOffset: toIndex > fromIndex ? toIndex + 1 : toIndex
+        )
+        applySortOrder(reordered)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedAccount = nil
+        return true
     }
 }
