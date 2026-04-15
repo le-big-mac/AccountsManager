@@ -9,9 +9,17 @@ struct CurrencyBreakdownItem: Identifiable {
 
 extension Account {
     var originalCurrencyBreakdown: [CurrencyBreakdownItem] {
-        guard accountType == .investment else { return [] }
-
         var totals: [String: Decimal] = [:]
+
+        if accountType == .bankAccount {
+            for balance in bankBalances {
+                totals[reportingCurrency(for: balance.currency), default: 0] += reportingAmount(
+                    balance.amount,
+                    currency: balance.currency
+                )
+            }
+            return visibleBreakdown(from: totals)
+        }
 
         for holding in holdings {
             let currency = reportingCurrency(for: holding.priceCurrency)
@@ -29,6 +37,10 @@ extension Account {
             )
         }
 
+        return visibleBreakdown(from: totals)
+    }
+
+    private func visibleBreakdown(from totals: [String: Decimal]) -> [CurrencyBreakdownItem] {
         let nonZero = totals
             .filter { $0.value != 0 }
             .map { CurrencyBreakdownItem(currency: $0.key, amount: $0.value) }

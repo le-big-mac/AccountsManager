@@ -179,24 +179,13 @@ struct AccountListView: View {
 
         // Refresh bank balances (each account has its own refresh token)
         for account in accounts where account.accountType == .bankAccount {
-            guard let accountIds = account.trueLayerAccountId,
-                  let refreshToken = account.trueLayerRefreshToken else { continue }
+            guard let refreshToken = account.trueLayerRefreshToken else { continue }
             do {
                 let result = try await TrueLayerService.shared.refreshAccessToken(refreshToken: refreshToken)
                 if let newRefresh = result.refreshToken {
                     account.trueLayerRefreshToken = newRefresh
                 }
-                let ids = accountIds.split(separator: ",").map(String.init)
-                var total: Decimal = 0
-                for id in ids {
-                    if let balance = try? await TrueLayerService.shared.fetchBalance(
-                        accountId: id, accessToken: result.accessToken
-                    ) {
-                        total += balance
-                    }
-                }
-                let entry = BalanceEntry(amount: total, source: .bankSync)
-                account.balanceEntries.append(entry)
+                await BankSyncService.sync(account: account, accessToken: result.accessToken)
             } catch {
                 continue
             }

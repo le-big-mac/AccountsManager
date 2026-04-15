@@ -12,7 +12,7 @@ struct BankConnectionView: View {
     @State private var status: ConnectionStatus = .ready
     @State private var error: String?
     @State private var bankAccounts: [TrueLayerService.BankAccount] = []
-    @State private var balancePreviews: [String: Decimal] = [:]
+    @State private var balancePreviews: [String: TrueLayerService.BalanceSnapshot] = [:]
     @State private var accessToken: String?
     @State private var expectedState: String?
 
@@ -148,8 +148,7 @@ struct BankConnectionView: View {
                     }
                     Spacer()
                     if !balancePreviews.isEmpty {
-                        let total = balancePreviews.values.reduce(Decimal.zero, +)
-                        Text(total.formattedGBP())
+                        Text(previewBreakdown)
                             .font(.subheadline.weight(.semibold).monospacedDigit())
                     }
                     Image(systemName: "checkmark.circle.fill")
@@ -180,7 +179,7 @@ struct BankConnectionView: View {
                                     .font(.subheadline)
                                 Spacer()
                                 if let balance = balancePreviews[bankAccount.accountId] {
-                                    Text(balance.formattedGBP())
+                                    Text(balance.amount.formattedCurrency(code: balance.currency))
                                         .font(.subheadline.monospacedDigit())
                                         .foregroundStyle(.secondary)
                                 }
@@ -227,6 +226,17 @@ struct BankConnectionView: View {
         DebugLog.write(message)
     }
 
+    private var previewBreakdown: String {
+        let totals = Dictionary(grouping: balancePreviews.values, by: \.currency)
+            .mapValues { snapshots in
+                snapshots.reduce(Decimal.zero) { $0 + $1.amount }
+            }
+        return totals
+            .sorted { $0.key < $1.key }
+            .map { $0.value.formattedCurrencyBreakdown(code: $0.key) }
+            .joined(separator: ", ")
+    }
+
     private func handleAuthCode(_ code: String) async {
         do {
             log("Exchanging code: \(code.prefix(30))...")
@@ -268,7 +278,7 @@ struct BankConnectionView: View {
                 // Fetch balance previews in background
                 for ba in bankAccounts {
                     Task {
-                        if let balance = try? await TrueLayerService.shared.fetchBalance(
+                        if let balance = try? await TrueLayerService.shared.fetchBalanceSnapshot(
                             accountId: ba.accountId, accessToken: tokenPair.accessToken
                         ) {
                             balancePreviews[ba.accountId] = balance
@@ -289,16 +299,7 @@ struct BankConnectionView: View {
 
         Task {
             guard let token = accessToken else { return }
-            var total: Decimal = 0
-            for ba in bankAccounts {
-                if let balance = try? await TrueLayerService.shared.fetchBalance(
-                    accountId: ba.accountId, accessToken: token
-                ) {
-                    total += balance
-                }
-            }
-            let entry = BalanceEntry(amount: total, source: .bankSync)
-            account.balanceEntries.append(entry)
+            await BankSyncService.sync(account: account, accessToken: token, knownAccounts: bankAccounts)
         }
     }
 
@@ -309,16 +310,7 @@ struct BankConnectionView: View {
 
         Task {
             guard let token = accessToken else { return }
-            do {
-                let balance = try await TrueLayerService.shared.fetchBalance(
-                    accountId: bankAccount.accountId,
-                    accessToken: token
-                )
-                let entry = BalanceEntry(amount: balance, source: .bankSync)
-                account.balanceEntries.append(entry)
-            } catch {
-                // Balance will be fetched on next sync
-            }
+            await BankSyncService.sync(account: account, accessToken: token, knownAccounts: [bankAccount])
         }
     }
 }

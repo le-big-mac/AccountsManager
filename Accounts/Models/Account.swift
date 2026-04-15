@@ -42,6 +42,12 @@ final class Account {
     @Relationship(deleteRule: .cascade, inverse: \CashBalance.account)
     var cashBalances: [CashBalance]
 
+    @Relationship(deleteRule: .cascade, inverse: \BankBalance.account)
+    var bankBalances: [BankBalance]
+
+    @Relationship(deleteRule: .cascade, inverse: \BankTransaction.account)
+    var bankTransactions: [BankTransaction]
+
     var accountType: AccountType {
         get { AccountType(rawValue: accountTypeRaw) ?? .investment }
         set { accountTypeRaw = newValue.rawValue }
@@ -55,6 +61,11 @@ final class Account {
     var currentBalance: Decimal {
         switch accountType {
         case .bankAccount:
+            if !bankBalances.isEmpty {
+                return bankBalances.reduce(Decimal.zero) { total, balance in
+                    total + balance.amountGBP
+                }
+            }
             return balanceEntries
                 .sorted { $0.date > $1.date }
                 .first?.amount ?? 0
@@ -72,6 +83,9 @@ final class Account {
     var lastUpdated: Date? {
         switch accountType {
         case .bankAccount:
+            if let updatedAt = bankBalances.map(\.updatedAt).max() {
+                return updatedAt
+            }
             return balanceEntries
                 .sorted { $0.date > $1.date }
                 .first?.date
@@ -96,5 +110,7 @@ final class Account {
         self.holdings = []
         self.balanceEntries = []
         self.cashBalances = []
+        self.bankBalances = []
+        self.bankTransactions = []
     }
 }

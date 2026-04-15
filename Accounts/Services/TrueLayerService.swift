@@ -162,7 +162,7 @@ actor TrueLayerService {
         return accountsResponse.results
     }
 
-    func fetchBalance(accountId: String, accessToken: String) async throws -> Decimal {
+    func fetchBalanceSnapshot(accountId: String, accessToken: String) async throws -> BalanceSnapshot {
         let url = URL(string: "\(apiBaseURL)/accounts/\(accountId)/balance")!
         var request = URLRequest(url: url)
         request.cachePolicy = .reloadIgnoringLocalCacheData
@@ -181,13 +181,52 @@ actor TrueLayerService {
         // TrueLayer returns balance in minor units (pence) for the v1 balances endpoint,
         // but the /accounts/{id}/balance endpoint may return in major units.
         // Handle both cases.
+        let amount: Decimal
         if let current = balance.current {
-            return current
+            amount = current
         } else if let currentMinor = balance.currentBalanceInMinor {
-            return Decimal(currentMinor) / 100
+            amount = Decimal(currentMinor) / 100
+        } else {
+            throw TrueLayerError.noBalance
         }
 
-        throw TrueLayerError.noBalance
+        return BalanceSnapshot(
+            accountId: accountId,
+            amount: amount,
+            currency: normalizedCurrency(balance.currency)
+        )
+    }
+
+    func fetchBalance(accountId: String, accessToken: String) async throws -> Decimal {
+        try await fetchBalanceSnapshot(accountId: accountId, accessToken: accessToken).amount
+    }
+
+    func fetchTransactions(accountId: String, accessToken: String) async throws -> [TransactionSnapshot] {
+        var components = URLComponents(string: "\(apiBaseURL)/accounts/\(accountId)/transactions")!
+        components.queryItems = [
+            URLQueryItem(name: "from", value: Self.apiDateFormatter.string(from: Calendar.current.date(byAdding: .day, value: -90, to: Date()) ?? Date())),
+            URLQueryItem(name: "to", value: Self.apiDateFormatter.string(from: Date())),
+        ]
+        let url = components.url!
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+
+        let (data, response) = try await session.data(for: request)
+        try validateHTTPResponse(response, data: data)
+        let transactionsResponse = try JSONDecoder().decode(TransactionsResponse.self, from: data)
+        return transactionsResponse.results.map { transaction in
+            TransactionSnapshot(
+                id: transaction.transactionId ?? "\(accountId):\(transaction.timestamp ?? ""):\(transaction.description ?? ""):\(transaction.amount?.description ?? "")",
+                accountId: accountId,
+                date: Self.parseDate(transaction.timestamp) ?? Date(),
+                description: transaction.description ?? transaction.merchantName ?? "Transaction",
+                amount: transaction.amount ?? 0,
+                currency: normalizedCurrency(transaction.currency)
+            )
+        }
     }
 
     // MARK: - Models
@@ -210,6 +249,21 @@ actor TrueLayerService {
         let accessToken: String
         let expiresAt: Date
         let refreshToken: String?
+    }
+
+    struct BalanceSnapshot {
+        let accountId: String
+        let amount: Decimal
+        let currency: String
+    }
+
+    struct TransactionSnapshot {
+        let id: String
+        let accountId: String
+        let date: Date
+        let description: String
+        let amount: Decimal
+        let currency: String
     }
 
     struct AccountsResponse: Decodable {
@@ -292,6 +346,28 @@ actor TrueLayerService {
         }
     }
 
+    struct TransactionsResponse: Decodable {
+        let results: [TransactionResult]
+    }
+
+    struct TransactionResult: Decodable {
+        let transactionId: String?
+        let timestamp: String?
+        let description: String?
+        let merchantName: String?
+        let amount: Decimal?
+        let currency: String?
+
+        enum CodingKeys: String, CodingKey {
+            case transactionId = "transaction_id"
+            case timestamp
+            case description
+            case merchantName = "merchant_name"
+            case amount
+            case currency
+        }
+    }
+
     private func validateHTTPResponse(_ response: URLResponse, data: Data) throws {
         guard let httpResponse = response as? HTTPURLResponse else { return }
         guard (200..<300).contains(httpResponse.statusCode) else {
@@ -317,6 +393,31 @@ actor TrueLayerService {
             DebugLog.write("TrueLayer \(name) body: \(body.prefix(4000))")
         }
     }
+
+    private func normalizedCurrency(_ currency: String?) -> String {
+        let trimmed = currency?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? "GBP" : trimmed.uppercased()
+    }
+
+    private static func parseDate(_ value: String?) -> Date? {
+        guard let value else { return nil }
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = isoFormatter.date(from: value) {
+            return date
+        }
+        isoFormatter.formatOptions = [.withInternetDateTime]
+        return isoFormatter.date(from: value)
+    }
+
+    private static let apiDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 }
 
 struct TrueLayerErrorResponse: Decodable {

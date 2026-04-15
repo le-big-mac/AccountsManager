@@ -56,7 +56,15 @@ struct AccountsApp: App {
 
         do {
             let configuration = ModelConfiguration(url: PersistentStoreBackup.storeURL)
-            modelContainer = try ModelContainer(for: Account.self, configurations: configuration)
+            modelContainer = try ModelContainer(
+                for: Account.self,
+                Holding.self,
+                CashBalance.self,
+                BalanceEntry.self,
+                BankBalance.self,
+                BankTransaction.self,
+                configurations: configuration
+            )
         } catch {
             DebugLog.write("SwiftData model container failed: \(error.localizedDescription)")
             fatalError("SwiftData model container failed: \(error)")
