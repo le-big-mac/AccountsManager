@@ -164,15 +164,19 @@ struct HoldingRow: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(holding.currentValueGBP.formattedGBP())
                         .font(.system(.body, design: .rounded, weight: .semibold))
-                    if let openPnLPercent = holding.openPnLPercent {
-                        Text(openPnLPercent.formattedPercent())
-                            .font(.caption2)
-                            .foregroundStyle(openPnLPercent < 0 ? Color.orange : (openPnLPercent > 0 ? Color.green : Color.secondary))
-                    }
                     if holding.priceCurrency != "GBP" {
                         Text(holding.localCurrentValue.formattedCurrency(code: holding.priceCurrency))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                        if let openPnLPercent = holding.openPnLPercent {
+                            Text(openPnLPercent.formattedPercent())
+                                .font(.caption2)
+                                .foregroundStyle(openPnLPercent < 0 ? Color.orange : (openPnLPercent > 0 ? Color.green : Color.secondary))
+                        }
+                    } else if let openPnLPercent = holding.openPnLPercent {
+                        Text(openPnLPercent.formattedPercent())
+                            .font(.caption2)
+                            .foregroundStyle(openPnLPercent < 0 ? Color.orange : (openPnLPercent > 0 ? Color.green : Color.secondary))
                     }
                 }
             } else {

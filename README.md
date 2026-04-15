@@ -36,6 +36,7 @@ Current account sources:
 - Headline value is shown in GBP
 - Mixed-currency accounts also show the original currency breakdown
 - For CSV-backed accounts, the CSV is the source of truth and can be re-imported
+- Holdings can show open P&L percentage when an average purchase price is available
 - Analyst targets are stored on each holding when available
 
 ## Requirements
