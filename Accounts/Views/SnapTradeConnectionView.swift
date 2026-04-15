@@ -1,10 +1,12 @@
 import AppKit
 import SwiftUI
+import SwiftData
 
 struct SnapTradeConnectionView: View {
     @Bindable var account: Account
     @Environment(AppState.self) private var appState
     @Environment(\.dismiss) private var dismiss
+    @Query private var existingAccounts: [Account]
 
     @State private var isWorking = false
     @State private var status = "Connect a brokerage in SnapTrade, then return here."
@@ -97,16 +99,28 @@ struct SnapTradeConnectionView: View {
 
         do {
             let accounts = try await SnapTradeService.shared.listAccounts()
+            let linkedAccountIDs = Set(
+                existingAccounts
+                    .filter { $0.id != account.id }
+                    .compactMap(\.snapTradeAccountId)
+            )
+            let importableAccounts = accounts.filter { snapAccount in
+                !linkedAccountIDs.contains(snapAccount.id)
+            }
+
             guard !accounts.isEmpty else {
                 throw SnapTradeError.api("No SnapTrade brokerage accounts were found yet.")
             }
+            guard !importableAccounts.isEmpty else {
+                throw SnapTradeError.api("All connected SnapTrade accounts are already linked in the app.")
+            }
 
-            if accounts.count == 1, let snapAccount = accounts.first {
+            if importableAccounts.count == 1, let snapAccount = importableAccounts.first {
                 await connectSelectedAccount(snapAccount)
                 return
             }
 
-            availableAccounts = accounts.sorted { lhs, rhs in
+            availableAccounts = importableAccounts.sorted { lhs, rhs in
                 let lhsInstitution = lhs.institutionName?.localizedLowercase ?? ""
                 let rhsInstitution = rhs.institutionName?.localizedLowercase ?? ""
                 if lhsInstitution != rhsInstitution {
