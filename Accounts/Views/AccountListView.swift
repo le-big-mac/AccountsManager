@@ -71,7 +71,10 @@ struct AccountListView: View {
                                 .onTapGesture {
                                     selectedAccount = account
                                 }
-                                .draggable(account.id.uuidString)
+                                .draggable(account.id.uuidString) {
+                                    Color.clear
+                                        .frame(width: 1, height: 1)
+                                }
                                 .dropDestination(for: String.self) { items, _ in
                                     guard let id = items.first,
                                           let dragged = accounts.first(where: { $0.id.uuidString == id }) else {
@@ -92,10 +95,6 @@ struct AccountListView: View {
                                     DragGesture(minimumDistance: 2)
                                         .onChanged { _ in
                                             draggedAccount = account
-                                        }
-                                        .onEnded { _ in
-                                            draggedAccount = nil
-                                            dropTargetAccountID = nil
                                         }
                                 )
                             .contextMenu {
