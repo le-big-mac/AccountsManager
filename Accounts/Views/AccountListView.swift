@@ -18,6 +18,7 @@ struct AccountListView: View {
     @State private var isRefreshing = false
     @State private var draggedAccount: Account?
     @State private var dropTargetAccountID: UUID?
+    @State private var hasRecoveredDetachedHoldings = false
 
     private var grandTotal: Decimal {
         accounts.reduce(Decimal.zero) { $0 + $1.currentBalance }
@@ -187,6 +188,7 @@ struct AccountListView: View {
         }
         .onAppear {
             normalizeSortOrderIfNeeded()
+            recoverDetachedHoldingMetadataIfNeeded()
         }
         .alert(
             "Delete Account?",
@@ -216,6 +218,72 @@ struct AccountListView: View {
         let orders = accounts.map(\.sortOrder)
         guard Set(orders).count != orders.count || orders.contains(0) else { return }
         normalizeSortOrder()
+    }
+
+    private func recoverDetachedHoldingMetadataIfNeeded() {
+        guard !hasRecoveredDetachedHoldings else { return }
+        hasRecoveredDetachedHoldings = true
+
+        let descriptor = FetchDescriptor<Holding>()
+        guard let allHoldings = try? modelContext.fetch(descriptor) else { return }
+
+        let orphanHoldings = allHoldings.filter { $0.account == nil }
+        guard !orphanHoldings.isEmpty else { return }
+
+        let liveHoldings = accounts.flatMap(\.holdings)
+        var matchedOrphanIDs = Set<PersistentIdentifier>()
+
+        for liveHolding in liveHoldings {
+            guard let orphan = orphanHoldings.first(where: { orphan in
+                holdingIdentifierKey(for: orphan) == holdingIdentifierKey(for: liveHolding)
+            }) else {
+                continue
+            }
+
+            if liveHolding.analystConsensusTarget == nil, let value = orphan.analystConsensusTarget {
+                liveHolding.analystConsensusTarget = value
+            }
+            if liveHolding.analystTargetLow == nil, let value = orphan.analystTargetLow {
+                liveHolding.analystTargetLow = value
+            }
+            if liveHolding.analystTargetHigh == nil, let value = orphan.analystTargetHigh {
+                liveHolding.analystTargetHigh = value
+            }
+            if liveHolding.analystTargetCurrencyRaw.isEmpty, !orphan.analystTargetCurrencyRaw.isEmpty {
+                liveHolding.analystTargetCurrencyRaw = orphan.analystTargetCurrencyRaw
+            }
+            if liveHolding.analystTargetUpdatedAt == nil, let updatedAt = orphan.analystTargetUpdatedAt {
+                liveHolding.analystTargetUpdatedAt = updatedAt
+            }
+            if liveHolding.averagePurchasePrice == nil, let averagePurchasePrice = orphan.averagePurchasePrice {
+                liveHolding.averagePurchasePrice = averagePurchasePrice
+            }
+
+            matchedOrphanIDs.insert(orphan.persistentModelID)
+        }
+
+        for orphan in orphanHoldings where matchedOrphanIDs.contains(orphan.persistentModelID) {
+            modelContext.delete(orphan)
+        }
+    }
+
+    private func holdingIdentifierKey(for holding: Holding) -> String {
+        if let ticker = normalizedIdentifier(holding.ticker), !ticker.isEmpty {
+            return "ticker:\(ticker)"
+        }
+        if let isin = normalizedIdentifier(holding.isin), !isin.isEmpty {
+            return "isin:\(isin)"
+        }
+        if let sedol = normalizedIdentifier(holding.sedol), !sedol.isEmpty {
+            return "sedol:\(sedol)"
+        }
+        return "name:\(normalizedIdentifier(holding.name) ?? "")"
+    }
+
+    private func normalizedIdentifier(_ value: String?) -> String? {
+        value?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
     }
 
     private func normalizeSortOrder() {
