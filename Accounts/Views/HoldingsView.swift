@@ -144,6 +144,16 @@ struct HoldingRow: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                if let dailyChange = holding.dailyChange,
+                   let dailyChangePercent = holding.dailyChangePercent {
+                    HStack(spacing: 4) {
+                        Text(dailyChange.formattedCurrency(code: holding.priceCurrency))
+                            .font(.caption)
+                        Text(dailyChangePercent.formattedPercent())
+                            .font(.caption)
+                    }
+                    .foregroundStyle(dailyChange < 0 ? Color.orange : (dailyChange > 0 ? Color.green : Color.secondary))
+                }
                 if let target = holding.analystConsensusTarget {
                     HStack(spacing: 4) {
                         Text("Target \(target.formattedCurrency(code: holding.analystTargetCurrency))")

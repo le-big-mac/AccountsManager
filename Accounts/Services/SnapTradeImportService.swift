@@ -38,8 +38,8 @@ enum SnapTradeImportService {
             account.snapTradeInstitutionName = snapTradeAccount.institutionName
         }
 
+        await PriceService.shared.refreshHoldings(account.holdings)
         await PriceService.shared.refreshHoldingFXRates(account.holdings)
-        PriceService.shared.scheduleAnalystTargetRefresh(account.holdings)
         await PriceService.shared.refreshCashBalances(account.cashBalances)
     }
 

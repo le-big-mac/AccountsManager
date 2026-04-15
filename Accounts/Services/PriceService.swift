@@ -207,7 +207,11 @@ final class PriceService {
                 holding.fxRateToGBP = fxRate
                 holding.fxRateDate = Date()
                 holding.lastPriceDate = Date()
+                holding.dailyChange = quote.change
+                holding.dailyChangePercent = decimal(from: quote.changePercent / 100)
             } catch {
+                holding.dailyChange = nil
+                holding.dailyChangePercent = nil
                 continue
             }
         }
@@ -498,6 +502,10 @@ final class PriceService {
     private func double(from decimal: Decimal?) -> Double? {
         guard let decimal else { return nil }
         return NSDecimalNumber(decimal: decimal).doubleValue
+    }
+
+    private func decimal(from value: Double) -> Decimal {
+        Decimal(string: String(value)) ?? 0
     }
 
     private func inferredCurrency(for ticker: String) -> String {

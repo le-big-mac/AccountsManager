@@ -56,6 +56,8 @@ final class Holding {
     var fxRateToGBP: Decimal?
     var fxRateDate: Date?
     var lastPriceDate: Date?
+    var dailyChange: Decimal?
+    var dailyChangePercent: Decimal?
     var analystConsensusTarget: Decimal?
     var analystTargetLow: Decimal?
     var analystTargetHigh: Decimal?
