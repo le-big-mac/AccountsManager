@@ -58,7 +58,6 @@ struct AccountListView: View {
                                 .contentShape(Rectangle())
                                 .background(selectedAccount == account ? Color.accentColor.opacity(0.14) : Color.clear)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .opacity(draggedAccount == account ? 0.45 : 1)
                                 .overlay(alignment: .top) {
                                     if showsDropIndicator(for: account, edge: .top) {
                                         AccountDropIndicator()
