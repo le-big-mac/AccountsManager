@@ -17,6 +17,7 @@ struct AccountListView: View {
     @State private var accountPendingDeletion: Account?
     @State private var isRefreshing = false
     @State private var draggedAccount: Account?
+    @State private var dropTargetAccountID: UUID?
 
     private var grandTotal: Decimal {
         accounts.reduce(Decimal.zero) { $0 + $1.currentBalance }
@@ -58,6 +59,16 @@ struct AccountListView: View {
                                 .background(selectedAccount == account ? Color.accentColor.opacity(0.14) : Color.clear)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
                                 .opacity(draggedAccount == account ? 0.45 : 1)
+                                .overlay(alignment: .top) {
+                                    if showsDropIndicator(for: account, edge: .top) {
+                                        AccountDropIndicator()
+                                    }
+                                }
+                                .overlay(alignment: .bottom) {
+                                    if showsDropIndicator(for: account, edge: .bottom) {
+                                        AccountDropIndicator()
+                                    }
+                                }
                                 .onTapGesture {
                                     selectedAccount = account
                                 }
@@ -73,10 +84,13 @@ struct AccountListView: View {
                                     }
                                     moveAccount(dragged, before: account)
                                     draggedAccount = nil
+                                    dropTargetAccountID = nil
                                     return true
                                 } isTargeted: { targeted in
                                     if targeted {
-                                        draggedAccount = draggedAccount ?? nil
+                                        dropTargetAccountID = account.id
+                                    } else if dropTargetAccountID == account.id {
+                                        dropTargetAccountID = nil
                                     }
                                 }
                                 .simultaneousGesture(
@@ -224,6 +238,18 @@ struct AccountListView: View {
         applySortOrder(to: reordered)
     }
 
+    private func showsDropIndicator(for account: Account, edge: VerticalEdge) -> Bool {
+        guard dropTargetAccountID == account.id,
+              let draggedAccount,
+              draggedAccount != account,
+              let fromIndex = accounts.firstIndex(of: draggedAccount),
+              let toIndex = accounts.firstIndex(of: account) else {
+            return false
+        }
+
+        return fromIndex < toIndex ? edge == .bottom : edge == .top
+    }
+
     private func applySortOrder(to orderedAccounts: [Account]) {
         for (index, account) in orderedAccounts.enumerated() {
             account.sortOrder = (index + 1) * 10
@@ -265,5 +291,15 @@ struct AccountListView: View {
                 continue
             }
         }
+    }
+}
+
+private struct AccountDropIndicator: View {
+    var body: some View {
+        Capsule()
+            .fill(Color.accentColor)
+            .frame(height: 3)
+            .padding(.horizontal, 6)
+            .shadow(color: Color.accentColor.opacity(0.4), radius: 2)
     }
 }
