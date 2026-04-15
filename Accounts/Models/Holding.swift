@@ -62,6 +62,7 @@ final class Holding {
     var analystTargetHigh: Decimal?
     var analystTargetCurrencyRaw: String = ""
     var analystTargetUpdatedAt: Date?
+    var securityMetadata: SecurityMetadata?
     var account: Account?
 
     var currentValue: Decimal {
@@ -105,16 +106,46 @@ final class Holding {
         ticker ?? isin ?? sedol
     }
 
-    var analystTargetCurrency: String {
-        get {
-            let stored = normalizedCurrency(analystTargetCurrencyRaw)
-            return stored.isEmpty ? priceCurrency : stored
+    var securityMetadataKey: String {
+        if let ticker = normalizedIdentifier(ticker), !ticker.isEmpty {
+            return "ticker:\(ticker)"
         }
-        set { analystTargetCurrencyRaw = normalizedCurrency(newValue) }
+        if let isin = normalizedIdentifier(isin), !isin.isEmpty {
+            return "isin:\(isin)"
+        }
+        if let sedol = normalizedIdentifier(sedol), !sedol.isEmpty {
+            return "sedol:\(sedol)"
+        }
+        return "name:\(normalizedIdentifier(name) ?? "")"
+    }
+
+    var resolvedAnalystConsensusTarget: Decimal? {
+        securityMetadata?.analystConsensusTarget ?? analystConsensusTarget
+    }
+
+    var resolvedAnalystTargetLow: Decimal? {
+        securityMetadata?.analystTargetLow ?? analystTargetLow
+    }
+
+    var resolvedAnalystTargetHigh: Decimal? {
+        securityMetadata?.analystTargetHigh ?? analystTargetHigh
+    }
+
+    var resolvedAnalystTargetUpdatedAt: Date? {
+        securityMetadata?.analystTargetUpdatedAt ?? analystTargetUpdatedAt
+    }
+
+    var analystTargetCurrency: String {
+        let metadataCurrency = securityMetadata?.analystTargetCurrency ?? ""
+        if !metadataCurrency.isEmpty {
+            return metadataCurrency
+        }
+        let stored = normalizedCurrency(analystTargetCurrencyRaw)
+        return stored.isEmpty ? priceCurrency : stored
     }
 
     var analystConsensusUpsidePercent: Decimal? {
-        guard let target = analystConsensusTarget,
+        guard let target = resolvedAnalystConsensusTarget,
               let price = lastPrice,
               price != 0,
               analystTargetCurrency == priceCurrency else {
@@ -174,6 +205,12 @@ final class Holding {
             return "GBX"
         }
         return trimmed.uppercased()
+    }
+
+    private func normalizedIdentifier(_ value: String?) -> String? {
+        value?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
     }
 
     init(

@@ -18,7 +18,7 @@ struct AccountListView: View {
     @State private var isRefreshing = false
     @State private var draggedAccount: Account?
     @State private var dropTargetAccountID: UUID?
-    @State private var hasRecoveredDetachedHoldings = false
+    @State private var hasMigratedSecurityMetadata = false
 
     private var grandTotal: Decimal {
         accounts.reduce(Decimal.zero) { $0 + $1.currentBalance }
@@ -188,7 +188,7 @@ struct AccountListView: View {
         }
         .onAppear {
             normalizeSortOrderIfNeeded()
-            recoverDetachedHoldingMetadataIfNeeded()
+            migrateSecurityMetadataIfNeeded()
         }
         .alert(
             "Delete Account?",
@@ -220,49 +220,51 @@ struct AccountListView: View {
         normalizeSortOrder()
     }
 
-    private func recoverDetachedHoldingMetadataIfNeeded() {
-        guard !hasRecoveredDetachedHoldings else { return }
-        hasRecoveredDetachedHoldings = true
+    private func migrateSecurityMetadataIfNeeded() {
+        guard !hasMigratedSecurityMetadata else { return }
+        hasMigratedSecurityMetadata = true
 
-        let descriptor = FetchDescriptor<Holding>()
-        guard let allHoldings = try? modelContext.fetch(descriptor) else { return }
+        let holdingsDescriptor = FetchDescriptor<Holding>()
+        let metadataDescriptor = FetchDescriptor<SecurityMetadata>()
+        guard let allHoldings = try? modelContext.fetch(holdingsDescriptor) else { return }
+        let existingMetadata = (try? modelContext.fetch(metadataDescriptor)) ?? []
 
-        let orphanHoldings = allHoldings.filter { $0.account == nil }
-        guard !orphanHoldings.isEmpty else { return }
+        var metadataByKey = Dictionary(uniqueKeysWithValues: existingMetadata.map { ($0.securityKey, $0) })
 
-        let liveHoldings = accounts.flatMap(\.holdings)
-        var matchedOrphanIDs = Set<PersistentIdentifier>()
-
-        for liveHolding in liveHoldings {
-            guard let orphan = orphanHoldings.first(where: { orphan in
-                holdingIdentifierKey(for: orphan) == holdingIdentifierKey(for: liveHolding)
-            }) else {
-                continue
-            }
-
-            if liveHolding.analystConsensusTarget == nil, let value = orphan.analystConsensusTarget {
-                liveHolding.analystConsensusTarget = value
-            }
-            if liveHolding.analystTargetLow == nil, let value = orphan.analystTargetLow {
-                liveHolding.analystTargetLow = value
-            }
-            if liveHolding.analystTargetHigh == nil, let value = orphan.analystTargetHigh {
-                liveHolding.analystTargetHigh = value
-            }
-            if liveHolding.analystTargetCurrencyRaw.isEmpty, !orphan.analystTargetCurrencyRaw.isEmpty {
-                liveHolding.analystTargetCurrencyRaw = orphan.analystTargetCurrencyRaw
-            }
-            if liveHolding.analystTargetUpdatedAt == nil, let updatedAt = orphan.analystTargetUpdatedAt {
-                liveHolding.analystTargetUpdatedAt = updatedAt
-            }
-            if liveHolding.averagePurchasePrice == nil, let averagePurchasePrice = orphan.averagePurchasePrice {
-                liveHolding.averagePurchasePrice = averagePurchasePrice
+        for holding in allHoldings {
+            let key = holdingIdentifierKey(for: holding)
+            let metadata: SecurityMetadata
+            if let existing = metadataByKey[key] {
+                metadata = existing
+            } else {
+                let created = SecurityMetadata(securityKey: key)
+                modelContext.insert(created)
+                metadataByKey[key] = created
+                metadata = created
             }
 
-            matchedOrphanIDs.insert(orphan.persistentModelID)
+            if metadata.analystConsensusTarget == nil, let value = holding.analystConsensusTarget {
+                metadata.analystConsensusTarget = value
+            }
+            if metadata.analystTargetLow == nil, let value = holding.analystTargetLow {
+                metadata.analystTargetLow = value
+            }
+            if metadata.analystTargetHigh == nil, let value = holding.analystTargetHigh {
+                metadata.analystTargetHigh = value
+            }
+            if metadata.analystTargetCurrencyRaw.isEmpty, !holding.analystTargetCurrencyRaw.isEmpty {
+                metadata.analystTargetCurrencyRaw = holding.analystTargetCurrencyRaw
+            }
+            if metadata.analystTargetUpdatedAt == nil, let updatedAt = holding.analystTargetUpdatedAt {
+                metadata.analystTargetUpdatedAt = updatedAt
+            }
+
+            holding.securityMetadata = metadata
         }
 
-        for orphan in orphanHoldings where matchedOrphanIDs.contains(orphan.persistentModelID) {
+        PriceService.shared.primeSecurityMetadata(Array(metadataByKey.values))
+
+        for orphan in allHoldings where orphan.account == nil {
             modelContext.delete(orphan)
         }
     }

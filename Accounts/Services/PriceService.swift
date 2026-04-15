@@ -9,6 +9,7 @@ final class PriceService {
     private var cache: [String: CachedQuote] = [:]
     private var fxCache: [String: CachedFXRate] = [:]
     private var analystTargetCache: [String: CachedAnalystTarget] = [:]
+    private var securityMetadataCache: [String: SecurityMetadata] = [:]
     private var vanguardProductsCache: [VanguardProduct]?
     private var analystTargetRefreshTask: Task<Void, Never>?
     private var queuedAnalystTargetTickers: Set<String> = []
@@ -88,6 +89,12 @@ final class PriceService {
 
     var isConfigured: Bool {
         apiKey != nil && !(apiKey?.isEmpty ?? true)
+    }
+
+    func primeSecurityMetadata(_ metadata: [SecurityMetadata]) {
+        for item in metadata {
+            securityMetadataCache[item.securityKey] = item
+        }
     }
 
     func fetchQuote(ticker: String, fallbackCurrency: String? = nil) async throws -> CachedQuote {
@@ -182,6 +189,7 @@ final class PriceService {
 
     func refreshHoldings(_ holdings: [Holding]) async {
         for holding in holdings {
+            _ = securityMetadata(for: holding)
             do {
                 let quote: CachedQuote
                 if let vanguardQuote = try await fetchVanguardQuote(for: holding) {
@@ -268,23 +276,25 @@ final class PriceService {
             }
 
             do {
+                let metadata = securityMetadata(for: holding)
                 if let target = try await fetchAnalystTarget(ticker: ticker, currency: holding.priceCurrency) {
-                    holding.analystConsensusTarget = target.consensus
-                    holding.analystTargetLow = target.low
-                    holding.analystTargetHigh = target.high
-                    holding.analystTargetCurrency = target.currency
-                    holding.analystTargetUpdatedAt = Date()
+                    metadata.analystConsensusTarget = target.consensus
+                    metadata.analystTargetLow = target.low
+                    metadata.analystTargetHigh = target.high
+                    metadata.analystTargetCurrency = target.currency
+                    metadata.analystTargetUpdatedAt = Date()
                     refreshedAnalystTargetTickers.insert(ticker)
-                } else if holding.analystTargetUpdatedAt == nil {
-                    holding.analystTargetUpdatedAt = Date()
+                } else if metadata.analystTargetUpdatedAt == nil {
+                    metadata.analystTargetUpdatedAt = Date()
                     refreshedAnalystTargetTickers.insert(ticker)
                 }
             } catch {
                 if let priceError = error as? PriceError, priceError == .rateLimited {
                     return
                 }
-                if holding.analystConsensusTarget != nil || holding.analystTargetLow != nil || holding.analystTargetHigh != nil {
-                    holding.analystTargetUpdatedAt = holding.analystTargetUpdatedAt ?? Date()
+                let metadata = securityMetadata(for: holding)
+                if metadata.analystConsensusTarget != nil || metadata.analystTargetLow != nil || metadata.analystTargetHigh != nil {
+                    metadata.analystTargetUpdatedAt = metadata.analystTargetUpdatedAt ?? Date()
                     refreshedAnalystTargetTickers.insert(ticker)
                 }
             }
@@ -431,6 +441,7 @@ final class PriceService {
         cache.removeAll()
         fxCache.removeAll()
         analystTargetCache.removeAll()
+        securityMetadataCache.removeAll()
         queuedAnalystTargetTickers.removeAll()
         refreshedAnalystTargetTickers.removeAll()
         pendingAnalystTargetHoldings.removeAll()
@@ -446,8 +457,26 @@ final class PriceService {
     }
 
     private func needsAnalystTargetRefresh(for holding: Holding) -> Bool {
-        guard let updatedAt = holding.analystTargetUpdatedAt else { return true }
+        guard let updatedAt = securityMetadata(for: holding).analystTargetUpdatedAt else { return true }
         return Date().timeIntervalSince(updatedAt) > 7 * 24 * 60 * 60
+    }
+
+    private func securityMetadata(for holding: Holding) -> SecurityMetadata {
+        if let metadata = holding.securityMetadata {
+            securityMetadataCache[metadata.securityKey] = metadata
+            return metadata
+        }
+
+        let key = holding.securityMetadataKey
+        if let cached = securityMetadataCache[key] {
+            holding.securityMetadata = cached
+            return cached
+        }
+
+        let metadata = SecurityMetadata(securityKey: key)
+        holding.securityMetadata = metadata
+        securityMetadataCache[key] = metadata
+        return metadata
     }
 
     private func respectAlphaVantageThrottle() async throws {

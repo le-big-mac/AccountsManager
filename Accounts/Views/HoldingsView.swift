@@ -144,7 +144,7 @@ struct HoldingRow: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                if let target = holding.analystConsensusTarget {
+                if let target = holding.resolvedAnalystConsensusTarget {
                     HStack(spacing: 4) {
                         Text("Target \(target.formattedCurrency(code: holding.analystTargetCurrency))")
                             .font(.caption)

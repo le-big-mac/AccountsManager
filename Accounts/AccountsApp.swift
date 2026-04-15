@@ -57,6 +57,7 @@ struct AccountsApp: App {
             modelContainer = try ModelContainer(
                 for: Account.self,
                 Holding.self,
+                SecurityMetadata.self,
                 CashBalance.self,
                 BalanceEntry.self,
                 BankBalance.self,
