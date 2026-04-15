@@ -7,7 +7,7 @@ Native macOS SwiftUI app for tracking personal cash and investments in one place
 - Tracks UK bank accounts through TrueLayer Open Banking
 - Tracks investment accounts from either:
   - CSV files as the account source of truth
-  - SnapTrade sync for Robinhood
+  - SnapTrade sync for supported brokerages
 - Prices equities, ETFs, and funds with Financial Modeling Prep
 - Converts non-GBP holdings to GBP for portfolio totals
 - Shows per-account detail and a combined overview
@@ -16,7 +16,7 @@ Current account sources:
 
 - `TrueLayer`: bank/current accounts
 - `CSV File`: investment and fund accounts
-- `SnapTrade`: Robinhood investment accounts
+- `SnapTrade`: supported brokerage investment accounts
 
 ## Current Model
 
@@ -72,6 +72,12 @@ Build from the command line:
 xcodebuild -project Accounts.xcodeproj -scheme Accounts -destination 'platform=macOS' build
 ```
 
+Release build:
+
+```sh
+xcodebuild -project Accounts.xcodeproj -scheme Accounts -configuration Release -destination 'platform=macOS' build
+```
+
 Open in Xcode:
 
 ```sh
@@ -86,6 +92,17 @@ The app uses a custom URL scheme for auth callbacks:
 
 - `accounts://truelayer-callback`
 - `accounts://snaptrade-callback`
+
+## Install
+
+For personal use on the same Mac, build `Release` and copy `Accounts.app` into `/Applications`.
+
+The app's data is stored outside the app bundle, so replacing the installed app does not remove:
+
+- `~/Library/Application Support/default.store`
+- `~/Library/Application Support/Accounts/credentials.json`
+
+Those files contain your local data and credentials and are not affected by replacing `/Applications/Accounts.app`.
 
 ## Data Storage
 
