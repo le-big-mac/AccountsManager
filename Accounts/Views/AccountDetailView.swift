@@ -8,7 +8,6 @@ struct AccountDetailView: View {
     @State private var showingCSVImport = false
     @State private var showingBankConnection = false
     @State private var showingSnapTradeConnection = false
-    @State private var bankSyncNotice: String?
 
     var body: some View {
         ScrollView {
@@ -67,7 +66,6 @@ struct AccountDetailView: View {
                     }
 
                     bankHoldingsSection
-                    recentTransactionsSection
                 }
             }
             .padding()
@@ -80,17 +78,6 @@ struct AccountDetailView: View {
         }
         .sheet(isPresented: $showingSnapTradeConnection) {
             SnapTradeConnectionView(account: account)
-        }
-        .alert(
-            "Bank Sync Notice",
-            isPresented: Binding(
-                get: { bankSyncNotice != nil },
-                set: { if !$0 { bankSyncNotice = nil } }
-            )
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(bankSyncNotice ?? "")
         }
     }
 
@@ -178,46 +165,6 @@ struct AccountDetailView: View {
         }
     }
 
-    @ViewBuilder
-    private var recentTransactionsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Recent Transactions")
-                .font(.headline)
-
-            let recentTransactions: [BankTransaction] = account.bankTransactions
-                .sorted { $0.date > $1.date }
-                .prefix(10)
-                .map { $0 }
-            if recentTransactions.isEmpty {
-                Text("No transactions synced yet.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(Array(0..<recentTransactions.count), id: \.self) { index in
-                    transactionRow(recentTransactions[index])
-                    Divider()
-                }
-            }
-        }
-    }
-
-    private func transactionRow(_ transaction: BankTransaction) -> some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(transaction.descriptionText)
-                    .font(.subheadline)
-                    .lineLimit(1)
-                Text(transaction.date, style: .date)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Text(transaction.amount.formattedCurrency(code: transaction.currency))
-                .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                .foregroundStyle(transaction.amount < 0 ? Color.primary : Color.green)
-        }
-    }
-
     private func refreshPrices() async {
         isRefreshing = true
         defer { isRefreshing = false }
@@ -236,16 +183,8 @@ struct AccountDetailView: View {
         defer { isRefreshing = false }
         do {
             let accessToken = try await getValidAccessToken()
-            let result = await BankSyncService.sync(account: account, accessToken: accessToken)
+            await BankSyncService.sync(account: account, accessToken: accessToken)
             try? modelContext.save()
-            switch result.transactionStatus {
-            case .synced:
-                break
-            case .requiresReauthentication:
-                bankSyncNotice = "Balance updated, but recent transactions require reconnecting this bank in TrueLayer. The provider is returning sca_exceeded for the transactions endpoint after the PSU authentication window expires."
-            case .failed(let message):
-                bankSyncNotice = "Balance updated, but transaction sync failed: \(message)"
-            }
         } catch {
             // Token refresh failed
         }
