@@ -103,7 +103,7 @@ struct AccountDetailView: View {
                 Button {
                     showingSnapTradeConnection = true
                 } label: {
-                    Label(account.snapTradeAccountId == nil ? "Connect Robinhood" : "Reconnect", systemImage: "link.badge.plus")
+                    Label(account.snapTradeAccountId == nil ? "Connect Brokerage" : "Reconnect", systemImage: "link.badge.plus")
                 }
             } else {
                 Button {

@@ -29,12 +29,12 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("SnapTrade (Robinhood)") {
+            Section("SnapTrade") {
                 TextField("Client ID", text: $snapTradeClientId)
                     .textFieldStyle(.roundedBorder)
                 SecureField("Consumer Key", text: $snapTradeConsumerKey)
                     .textFieldStyle(.roundedBorder)
-                Text("Used to connect Robinhood through SnapTrade's read-only Connection Portal")
+                Text("Used to connect supported brokerages through SnapTrade's read-only Connection Portal")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

@@ -42,10 +42,20 @@ final class SnapTradeService {
     }
 
     func connectionPortalURL(
-        broker: String = "ROBINHOOD",
+        broker: String? = nil,
         redirectURL: String = "accounts://snaptrade-callback"
     ) async throws -> URL {
         let user = try await ensureUser()
+        var body: [String: JSONValue] = [
+            "connectionType": .string("read"),
+            "connectionPortalVersion": .string("v4"),
+            "customRedirect": .string(redirectURL),
+            "immediateRedirect": .bool(true),
+            "showCloseButton": .bool(true)
+        ]
+        if let broker, !broker.isEmpty {
+            body["broker"] = .string(broker)
+        }
         let response: SnapTradeLoginResponse = try await request(
             method: "POST",
             path: "/snapTrade/login",
@@ -53,14 +63,7 @@ final class SnapTradeService {
                 URLQueryItem(name: "userId", value: user.userId),
                 URLQueryItem(name: "userSecret", value: user.userSecret)
             ],
-            body: [
-                "broker": .string(broker),
-                "connectionType": .string("read"),
-                "connectionPortalVersion": .string("v4"),
-                "customRedirect": .string(redirectURL),
-                "immediateRedirect": .bool(true),
-                "showCloseButton": .bool(true)
-            ]
+            body: body
         )
         guard let url = URL(string: response.redirectURI) else {
             throw SnapTradeError.invalidResponse
