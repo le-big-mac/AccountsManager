@@ -10,7 +10,7 @@
     <true/>
     <key>keychain-access-groups</key>
     <array>
-        <string>$(AppIdentifierPrefix)com.chadon.accounts</string>
+        <string>$(AppIdentifierPrefix)io.github.le-big-mac.accountsmanager</string>
     </array>
 </dict>
 </plist>

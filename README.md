@@ -84,6 +84,8 @@ Open in Xcode:
 open Accounts.xcodeproj
 ```
 
+The default bundle identifier in `project.yml` is `io.github.le-big-mac.accountsmanager`. If you plan to sign or distribute your own build, change it to an identifier you control.
+
 ## Running
 
 Run from Xcode, or launch the built app from DerivedData after a successful build.
