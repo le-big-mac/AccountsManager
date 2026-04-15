@@ -9,6 +9,7 @@ Native macOS SwiftUI app for tracking personal cash and investments in one place
   - CSV files as the account source of truth
   - SnapTrade sync for supported brokerages
 - Prices equities, ETFs, and funds with Financial Modeling Prep
+- Stores analyst target prices for supported stocks and ETFs via Alpha Vantage
 - Converts non-GBP holdings to GBP for portfolio totals
 - Shows per-account detail and a combined overview
 
@@ -35,6 +36,7 @@ Current account sources:
 - Headline value is shown in GBP
 - Mixed-currency accounts also show the original currency breakdown
 - For CSV-backed accounts, the CSV is the source of truth and can be re-imported
+- Analyst targets are stored on each holding when available
 
 ## Requirements
 
@@ -53,6 +55,7 @@ They are not committed to the repo.
 Supported credentials:
 
 - `FMP API Key`
+- `Alpha Vantage API Key`
 - `TrueLayer Client ID`
 - `TrueLayer Client Secret`
 - `SnapTrade Client ID`
@@ -170,6 +173,21 @@ If the format changes in future, inspect:
 
 - `Accounts/Services/CSVParser.swift`
 - `Accounts/Services/PortfolioImportService.swift`
+
+## Analyst Targets
+
+Analyst targets are optional enrichment for holdings with a ticker and asset class `stock` or `etf`.
+
+- Source: Alpha Vantage `OVERVIEW`
+- Stored on each holding and reused until stale
+- Refreshed in the background rather than blocking price updates
+- Throttled and budgeted to fit the Alpha Vantage free-tier daily cap
+
+Current refresh policy:
+
+- if a holding has no stored target, it is eligible immediately
+- if a holding has a target, it refreshes when older than 7 days
+- cash and most fund/OEIC rows do not participate
 
 ## Project Structure
 
