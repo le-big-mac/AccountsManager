@@ -118,7 +118,11 @@ struct CashBalanceRow: View {
 struct HoldingRow: View {
     let holding: Holding
 
-    private let robinhoodLossColor = Color(red: 1.0, green: 0.313, blue: 0.298)
+    private let robinhoodLossColor = Color(
+        red: 235.0 / 255.0,
+        green: 93.0 / 255.0,
+        blue: 42.0 / 255.0
+    )
 
     private func percentColor(_ value: Decimal) -> Color {
         let displayValue = value.roundedForPercentDisplay()
