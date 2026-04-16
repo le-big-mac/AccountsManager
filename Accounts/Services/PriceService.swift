@@ -79,6 +79,33 @@ final class PriceService {
         let asOfDate: String?
     }
 
+    struct FidelityFactsheetPage: Decodable {
+        let props: FidelityProps
+    }
+
+    struct FidelityProps: Decodable {
+        let pageProps: FidelityPageProps
+    }
+
+    struct FidelityPageProps: Decodable {
+        let initialState: FidelityInitialState
+    }
+
+    struct FidelityInitialState: Decodable {
+        let fund: FidelityFundState
+    }
+
+    struct FidelityFundState: Decodable {
+        let priceDtls: FidelityPriceDetails?
+    }
+
+    struct FidelityPriceDetails: Decodable {
+        let lastBuySellPrice: String?
+        let changeAbsolute: String?
+        let changePercentage: String?
+        let currency: String?
+    }
+
     private var apiKey: String? {
         KeychainHelper.load(.fmpApiKey)
     }
@@ -194,6 +221,8 @@ final class PriceService {
                 let quote: CachedQuote
                 if let vanguardQuote = try await fetchVanguardQuote(for: holding) {
                     quote = vanguardQuote
+                } else if let fidelityQuote = try await fetchFidelityFundQuote(for: holding) {
+                    quote = fidelityQuote
                 } else {
                     guard let identifier = holding.ticker ?? holding.isin else { continue }
 
@@ -388,6 +417,40 @@ final class PriceService {
         return cached
     }
 
+    private func fetchFidelityFundQuote(for holding: Holding) async throws -> CachedQuote? {
+        guard holding.assetClass == .fund, let isin = holding.isin else { return nil }
+
+        let cacheKey = "fidelity:\(isin)"
+        if let cached = cache[cacheKey],
+           Date().timeIntervalSince(cached.fetchedAt) < 300 {
+            return cached
+        }
+
+        let url = URL(string: "https://www.fidelity.co.uk/factsheet-data/factsheet/\(isin)/performance")!
+        let (data, _) = try await URLSession.shared.data(from: url)
+        guard let html = String(data: data, encoding: .utf8),
+              let jsonData = nextDataJSON(from: html) else {
+            throw PriceError.noData
+        }
+
+        let page = try JSONDecoder().decode(FidelityFactsheetPage.self, from: jsonData)
+        guard let priceDetails = page.props.pageProps.initialState.fund.priceDtls,
+              let valueText = priceDetails.lastBuySellPrice,
+              let price = Decimal(string: valueText.replacingOccurrences(of: ",", with: "")) else {
+            throw PriceError.noData
+        }
+
+        let cached = CachedQuote(
+            price: price,
+            currency: normalizedCurrency(priceDetails.currency ?? holding.priceCurrency),
+            change: parsePercentOrAmount(priceDetails.changeAbsolute) ?? 0,
+            changePercent: double(from: parsePercentOrAmount(priceDetails.changePercentage)) ?? 0,
+            fetchedAt: Date()
+        )
+        cache[cacheKey] = cached
+        return cached
+    }
+
     private func vanguardPortId(for holding: Holding) async throws -> String? {
         let identifiers = [
             holding.ticker,
@@ -544,6 +607,16 @@ final class PriceService {
             .replacingOccurrences(of: "%", with: "")
             .replacingOccurrences(of: ",", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private func nextDataJSON(from html: String) -> Data? {
+        let startMarker = "<script id=\"__NEXT_DATA__\" type=\"application/json\">"
+        let endMarker = "</script>"
+        guard let startRange = html.range(of: startMarker) else { return nil }
+        let jsonStart = startRange.upperBound
+        guard let endRange = html.range(of: endMarker, range: jsonStart..<html.endIndex) else { return nil }
+        let json = String(html[jsonStart..<endRange.lowerBound])
+        return json.data(using: .utf8)
     }
 
     private func double(from decimal: Decimal?) -> Double? {
