@@ -1,6 +1,18 @@
 import Foundation
 
 extension Decimal {
+    func rounded(scale: Int, mode: NSDecimalNumber.RoundingMode = .plain) -> Decimal {
+        var value = self
+        var result = Decimal()
+        NSDecimalRound(&result, &value, scale, mode)
+        return result
+    }
+
+    func roundedForPercentDisplay(fractionDigits: Int = 1) -> Decimal {
+        let roundedValue = rounded(scale: fractionDigits + 2)
+        return roundedValue == 0 ? 0 : roundedValue
+    }
+
     func formattedCurrency(code: String, locale: Locale = Locale(identifier: "en_GB")) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
@@ -51,11 +63,12 @@ extension Decimal {
     }
 
     func formattedPercent() -> String {
+        let displayValue = roundedForPercentDisplay()
         let formatter = NumberFormatter()
         formatter.numberStyle = .percent
         formatter.maximumFractionDigits = 1
         formatter.minimumFractionDigits = 1
-        return formatter.string(from: self as NSDecimalNumber) ?? "0.0%"
+        return formatter.string(from: displayValue as NSDecimalNumber) ?? "0.0%"
     }
 }
 

@@ -118,6 +118,19 @@ struct CashBalanceRow: View {
 struct HoldingRow: View {
     let holding: Holding
 
+    private let robinhoodLossColor = Color(red: 1.0, green: 0.313, blue: 0.298)
+
+    private func percentColor(_ value: Decimal) -> Color {
+        let displayValue = value.roundedForPercentDisplay()
+        if displayValue < 0 {
+            return robinhoodLossColor
+        }
+        if displayValue > 0 {
+            return .green
+        }
+        return .secondary
+    }
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
@@ -152,7 +165,7 @@ struct HoldingRow: View {
                         if let upside = holding.analystConsensusUpsidePercent {
                             Text(upside.formattedPercent())
                                 .font(.caption)
-                                .foregroundStyle(upside < 0 ? Color.orange : Color.green)
+                                .foregroundStyle(percentColor(upside))
                         }
                     }
                 }
@@ -171,12 +184,12 @@ struct HoldingRow: View {
                         if let openPnLPercent = holding.openPnLPercent {
                             Text(openPnLPercent.formattedPercent())
                                 .font(.caption2)
-                                .foregroundStyle(openPnLPercent < 0 ? Color.orange : (openPnLPercent > 0 ? Color.green : Color.secondary))
+                                .foregroundStyle(percentColor(openPnLPercent))
                         }
                     } else if let openPnLPercent = holding.openPnLPercent {
                         Text(openPnLPercent.formattedPercent())
                             .font(.caption2)
-                            .foregroundStyle(openPnLPercent < 0 ? Color.orange : (openPnLPercent > 0 ? Color.green : Color.secondary))
+                            .foregroundStyle(percentColor(openPnLPercent))
                     }
                 }
             } else {
