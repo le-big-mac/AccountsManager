@@ -207,13 +207,13 @@ struct HoldingRow: View {
 
 struct AddHoldingSheet: View {
     let account: Account
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
     @State private var ticker = ""
     @State private var isin = ""
     @State private var unitsText = ""
+    @State private var averagePurchasePriceText = ""
     @State private var priceCurrency = "GBP"
     @State private var assetClass: HoldingAssetClass = .stock
 
@@ -226,6 +226,7 @@ struct AddHoldingSheet: View {
             TextField("Ticker (e.g. VWRL.L or AAPL)", text: $ticker)
             TextField("ISIN (optional, e.g. GB00BD3RZ582)", text: $isin)
             TextField("Units / Shares", text: $unitsText)
+            TextField("Average Purchase Price (optional)", text: $averagePurchasePriceText)
             Picker("Price Currency", selection: $priceCurrency) {
                 ForEach(supportedCurrencies, id: \.self) { currency in
                     Text(currency).tag(currency)
@@ -238,7 +239,7 @@ struct AddHoldingSheet: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 400, height: 300)
+        .frame(width: 400, height: 340)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -246,19 +247,114 @@ struct AddHoldingSheet: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Add") {
                     guard let units = Decimal(string: unitsText) else { return }
-                    let holding = Holding(
-                        name: name,
-                        ticker: ticker.isEmpty ? nil : ticker,
-                        isin: isin.isEmpty ? nil : isin,
-                        units: units,
-                        priceCurrency: priceCurrency,
-                        assetClass: assetClass
-                    )
-                    account.holdings.append(holding)
+                    let trimmedTicker = trimmedIdentifier(ticker)
+                    let trimmedISIN = trimmedIdentifier(isin)
+                    let averagePurchasePrice = Decimal(string: averagePurchasePriceText)
+
+                    if let existing = existingHolding(ticker: trimmedTicker, isin: trimmedISIN) {
+                        merge(
+                            units: units,
+                            averagePurchasePrice: averagePurchasePrice,
+                            into: existing,
+                            name: name,
+                            ticker: trimmedTicker,
+                            isin: trimmedISIN
+                        )
+                    } else {
+                        let holding = Holding(
+                            name: name,
+                            ticker: trimmedTicker,
+                            isin: trimmedISIN,
+                            units: units,
+                            priceCurrency: priceCurrency,
+                            assetClass: assetClass
+                        )
+                        holding.averagePurchasePrice = averagePurchasePrice
+                        account.holdings.append(holding)
+                    }
                     dismiss()
                 }
-                .disabled(name.isEmpty || Decimal(string: unitsText) == nil)
+                .disabled(
+                    name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        || Decimal(string: unitsText) == nil
+                        || (!averagePurchasePriceText.isEmpty && Decimal(string: averagePurchasePriceText) == nil)
+                )
             }
         }
+    }
+
+    private func existingHolding(ticker: String?, isin: String?) -> Holding? {
+        account.holdings.first { holding in
+            if let isin, normalizedIdentifier(holding.isin) == isin {
+                return true
+            }
+            if let ticker, normalizedIdentifier(holding.ticker) == ticker {
+                return true
+            }
+            return false
+        }
+    }
+
+    private func merge(
+        units newUnits: Decimal,
+        averagePurchasePrice newAveragePurchasePrice: Decimal?,
+        into existing: Holding,
+        name: String,
+        ticker: String?,
+        isin: String?
+    ) {
+        let existingUnits = existing.units
+        let totalUnits = existingUnits + newUnits
+
+        if totalUnits > 0 {
+            existing.averagePurchasePrice = mergedAveragePurchasePrice(
+                existingUnits: existingUnits,
+                existingAveragePurchasePrice: existing.averagePurchasePrice,
+                newUnits: newUnits,
+                newAveragePurchasePrice: newAveragePurchasePrice
+            )
+        }
+
+        existing.units = totalUnits
+        existing.name = name
+        if existing.ticker == nil {
+            existing.ticker = ticker
+        }
+        if existing.isin == nil {
+            existing.isin = isin
+        }
+        existing.priceCurrency = priceCurrency
+        existing.assetClass = assetClass
+    }
+
+    private func mergedAveragePurchasePrice(
+        existingUnits: Decimal,
+        existingAveragePurchasePrice: Decimal?,
+        newUnits: Decimal,
+        newAveragePurchasePrice: Decimal?
+    ) -> Decimal? {
+        switch (existingAveragePurchasePrice, newAveragePurchasePrice) {
+        case let (existingPrice?, newPrice?):
+            let totalUnits = existingUnits + newUnits
+            guard totalUnits > 0 else { return nil }
+            return ((existingUnits * existingPrice) + (newUnits * newPrice)) / totalUnits
+        case let (existingPrice?, nil):
+            return existingPrice
+        case let (nil, newPrice?):
+            return newPrice
+        case (nil, nil):
+            return nil
+        }
+    }
+
+    private func trimmedIdentifier(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func normalizedIdentifier(_ value: String?) -> String? {
+        value?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
     }
 }
