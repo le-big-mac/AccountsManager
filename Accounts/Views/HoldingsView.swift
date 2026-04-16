@@ -3,9 +3,12 @@ import SwiftData
 
 struct HoldingsView: View {
     @Bindable var account: Account
-    @Environment(\.modelContext) private var modelContext
     @State private var showingAddHolding = false
     @State private var sortMode: HoldingSortMode = .name
+
+    private var canAddManualHoldings: Bool {
+        account.investmentSourceType != .snapTrade
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -20,16 +23,18 @@ struct HoldingsView: View {
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 180)
-                Button {
-                    showingAddHolding = true
-                } label: {
-                    Label("Add", systemImage: "plus")
+                if canAddManualHoldings {
+                    Button {
+                        showingAddHolding = true
+                    } label: {
+                        Label("Add", systemImage: "plus")
+                    }
+                    .buttonStyle(.borderless)
                 }
-                .buttonStyle(.borderless)
             }
 
             if account.holdings.isEmpty && account.cashBalances.isEmpty {
-                Text("No holdings yet. Import a CSV or add manually.")
+                Text(emptyStateMessage)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 8)
@@ -57,6 +62,17 @@ struct HoldingsView: View {
         }
         .sheet(isPresented: $showingAddHolding) {
             AddHoldingSheet(account: account)
+        }
+    }
+
+    private var emptyStateMessage: String {
+        switch account.investmentSourceType {
+        case .snapTrade:
+            return "No holdings synced yet. Use Sync to refresh this SnapTrade account."
+        case .csvFile:
+            return "No holdings yet. Import a CSV or add manually."
+        case nil:
+            return "No holdings yet. Add manually."
         }
     }
 
