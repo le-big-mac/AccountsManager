@@ -19,6 +19,7 @@ struct AccountListView: View {
     @State private var draggedAccount: Account?
     @State private var dropTargetAccountID: UUID?
     @State private var hasMigratedSecurityMetadata = false
+    @FocusState private var isSidebarFocused: Bool
 
     private var grandTotal: Decimal {
         accounts.reduce(Decimal.zero) { $0 + $1.currentBalance }
@@ -26,104 +27,20 @@ struct AccountListView: View {
 
     var body: some View {
         NavigationSplitView {
-            VStack(spacing: 0) {
-                Button {
-                    selectedAccount = nil
-                } label: {
-                    HStack {
-                        Image(systemName: "chart.pie.fill")
-                            .foregroundStyle(.blue)
-                        Text("Overview")
-                        Spacer()
-                        Text(grandTotal.formattedGBP())
-                            .font(.system(.caption, design: .rounded, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
-                    .background(selectedAccount == nil ? Color.accentColor.opacity(0.14) : Color.clear)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            ScrollViewReader { proxy in
+                sidebarContent(proxy: proxy)
+                .focusable()
+                .focused($isSidebarFocused)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    isSidebarFocused = true
                 }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 8)
-                .padding(.top, 8)
-
-                ScrollView {
-                    LazyVStack(spacing: 4) {
-                        ForEach(accounts) { account in
-                            AccountRow(account: account)
-                                .frame(maxWidth: .infinity, minHeight: 58, maxHeight: 58, alignment: .leading)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .contentShape(Rectangle())
-                                .background(selectedAccount == account ? Color.accentColor.opacity(0.14) : Color.clear)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .overlay(alignment: .top) {
-                                    if showsDropIndicator(for: account, edge: .top) {
-                                        AccountDropIndicator()
-                                    }
-                                }
-                                .overlay(alignment: .bottom) {
-                                    if showsDropIndicator(for: account, edge: .bottom) {
-                                        AccountDropIndicator()
-                                    }
-                                }
-                                .onTapGesture {
-                                    selectedAccount = account
-                                }
-                                .draggable(account.id.uuidString) {
-                                    Color.clear
-                                        .frame(width: 1, height: 1)
-                                }
-                                .dropDestination(for: String.self) { items, _ in
-                                    guard let id = items.first,
-                                          let dragged = accounts.first(where: { $0.id.uuidString == id }) else {
-                                        return false
-                                    }
-                                    moveAccount(dragged, before: account)
-                                    draggedAccount = nil
-                                    dropTargetAccountID = nil
-                                    return true
-                                } isTargeted: { targeted in
-                                    if targeted {
-                                        dropTargetAccountID = account.id
-                                    } else if dropTargetAccountID == account.id {
-                                        dropTargetAccountID = nil
-                                    }
-                                }
-                                .simultaneousGesture(
-                                    DragGesture(minimumDistance: 2)
-                                        .onChanged { _ in
-                                            draggedAccount = account
-                                        }
-                                )
-                            .contextMenu {
-                                Button("Archive") {
-                                    account.isArchived = true
-                                    normalizeSortOrder()
-                                }
-                                Button("Delete", role: .destructive) {
-                                    accountPendingDeletion = account
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 8)
+                .onMoveCommand { direction in
+                    handleSidebarMove(direction, proxy: proxy)
                 }
-
-                Divider()
-
-                HStack {
-                    Text("Total")
-                        .font(.headline)
-                    Spacer()
-                    Text(grandTotal.formattedGBP())
-                        .font(.system(.headline, design: .rounded, weight: .bold))
+                .onChange(of: selectedAccount?.id) { _, _ in
+                    scrollToSelection(using: proxy)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
             }
             .navigationTitle("Accounts")
             .navigationSplitViewColumnWidth(min: 320, ideal: 360, max: 460)
@@ -189,6 +106,9 @@ struct AccountListView: View {
         .onAppear {
             normalizeSortOrderIfNeeded()
             migrateSecurityMetadataIfNeeded()
+            DispatchQueue.main.async {
+                isSidebarFocused = true
+            }
         }
         .alert(
             "Delete Account?",
@@ -213,6 +133,126 @@ struct AccountListView: View {
             Text("This removes \(account.name), including holdings, balances, and connection tokens.")
         }
     }
+
+    @ViewBuilder
+    private func sidebarContent(proxy: ScrollViewProxy) -> some View {
+        VStack(spacing: 0) {
+            overviewButton
+
+            ScrollView {
+                LazyVStack(spacing: 4) {
+                    ForEach(accounts) { account in
+                        sidebarAccountRow(account)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 8)
+            }
+
+            Divider()
+
+            sidebarFooter
+        }
+    }
+
+    private var overviewButton: some View {
+        Button {
+            selectOverview()
+        } label: {
+            HStack {
+                Image(systemName: "chart.pie.fill")
+                    .foregroundStyle(.blue)
+                Text("Overview")
+                Spacer()
+                Text(grandTotal.formattedGBP())
+                    .font(.system(.caption, design: .rounded, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+            .background(selectedAccount == nil ? Color.accentColor.opacity(0.14) : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 8)
+        .padding(.top, 8)
+        .id(sidebarOverviewID)
+    }
+
+    @ViewBuilder
+    private func sidebarAccountRow(_ account: Account) -> some View {
+        AccountRow(account: account)
+            .frame(maxWidth: .infinity, minHeight: 58, maxHeight: 58, alignment: .leading)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+            .background(selectedAccount == account ? Color.accentColor.opacity(0.14) : Color.clear)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(alignment: .top) {
+                if showsDropIndicator(for: account, edge: .top) {
+                    AccountDropIndicator()
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if showsDropIndicator(for: account, edge: .bottom) {
+                    AccountDropIndicator()
+                }
+            }
+            .onTapGesture {
+                selectAccount(account)
+            }
+            .draggable(account.id.uuidString) {
+                Color.clear
+                    .frame(width: 1, height: 1)
+            }
+            .dropDestination(for: String.self) { items, _ in
+                guard let id = items.first,
+                      let dragged = accounts.first(where: { $0.id.uuidString == id }) else {
+                    return false
+                }
+                moveAccount(dragged, before: account)
+                draggedAccount = nil
+                dropTargetAccountID = nil
+                return true
+            } isTargeted: { targeted in
+                if targeted {
+                    dropTargetAccountID = account.id
+                } else if dropTargetAccountID == account.id {
+                    dropTargetAccountID = nil
+                }
+            }
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 2)
+                    .onChanged { _ in
+                        draggedAccount = account
+                    }
+            )
+            .contextMenu {
+                Button("Archive") {
+                    account.isArchived = true
+                    normalizeSortOrder()
+                }
+                Button("Delete", role: .destructive) {
+                    accountPendingDeletion = account
+                }
+            }
+            .id(account.id)
+    }
+
+    private var sidebarFooter: some View {
+        HStack {
+            Text("Total")
+                .font(.headline)
+            Spacer()
+            Text(grandTotal.formattedGBP())
+                .font(.system(.headline, design: .rounded, weight: .bold))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+
+    private var sidebarOverviewID: String { "sidebar-overview" }
 
     private func normalizeSortOrderIfNeeded() {
         let orders = accounts.map(\.sortOrder)
@@ -290,6 +330,58 @@ struct AccountListView: View {
 
     private func normalizeSortOrder() {
         applySortOrder(to: accounts)
+    }
+
+    private func selectOverview() {
+        selectedAccount = nil
+        isSidebarFocused = true
+    }
+
+    private func selectAccount(_ account: Account) {
+        selectedAccount = account
+        isSidebarFocused = true
+    }
+
+    private func handleSidebarMove(_ direction: MoveCommandDirection, proxy: ScrollViewProxy) {
+        switch direction {
+        case .up:
+            moveSelection(by: -1)
+        case .down:
+            moveSelection(by: 1)
+        default:
+            return
+        }
+        scrollToSelection(using: proxy)
+    }
+
+    private func moveSelection(by delta: Int) {
+        if accounts.isEmpty { return }
+
+        let currentIndex: Int
+        if let selectedAccount,
+           let index = accounts.firstIndex(of: selectedAccount) {
+            currentIndex = index + 1
+        } else {
+            currentIndex = 0
+        }
+
+        let nextIndex = currentIndex + delta
+        if nextIndex <= 0 {
+            selectedAccount = nil
+            return
+        }
+        guard nextIndex <= accounts.count else { return }
+        selectedAccount = accounts[nextIndex - 1]
+    }
+
+    private func scrollToSelection(using proxy: ScrollViewProxy) {
+        withAnimation(.easeInOut(duration: 0.12)) {
+            if let selectedAccount {
+                proxy.scrollTo(selectedAccount.id, anchor: .center)
+            } else {
+                proxy.scrollTo(sidebarOverviewID, anchor: .center)
+            }
+        }
     }
 
     private func moveAccount(_ dragged: Account, before target: Account) {
