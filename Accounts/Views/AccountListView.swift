@@ -1,5 +1,7 @@
+import AppKit
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 struct AccountListView: View {
     @Query(filter: #Predicate<Account> { !$0.isArchived },
@@ -16,9 +18,11 @@ struct AccountListView: View {
     @State private var selectedAccount: Account?
     @State private var accountPendingDeletion: Account?
     @State private var isRefreshing = false
+    @State private var isExporting = false
     @State private var draggedAccount: Account?
     @State private var dropTargetAccountID: UUID?
     @State private var hasMigratedSecurityMetadata = false
+    @State private var exportAlert: ExportAlert?
     @FocusState private var isSidebarFocused: Bool
 
     private var grandTotal: Decimal {
@@ -61,6 +65,15 @@ struct AccountListView: View {
                               systemImage: "arrow.clockwise")
                     }
                     .disabled(isRefreshing)
+                }
+                ToolbarItem {
+                    Button {
+                        exportPortfolioCSV()
+                    } label: {
+                        Label(isExporting ? "Exporting..." : "Export CSV",
+                              systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(isExporting || accounts.isEmpty)
                 }
                 ToolbarItem {
                     Button {
@@ -132,6 +145,13 @@ struct AccountListView: View {
             }
         } message: { account in
             Text("This removes \(account.name), including holdings, balances, and connection tokens.")
+        }
+        .alert(item: $exportAlert) { alert in
+            Alert(
+                title: Text(alert.title),
+                message: Text(alert.message),
+                dismissButton: .default(Text("OK"))
+            )
         }
     }
 
@@ -254,6 +274,31 @@ struct AccountListView: View {
     }
 
     private var sidebarOverviewID: String { "sidebar-overview" }
+
+    private func exportPortfolioCSV() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.commaSeparatedText, .text]
+        panel.nameFieldStringValue = PortfolioCSVExporter.defaultFilename()
+        panel.canCreateDirectories = true
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        isExporting = true
+        defer { isExporting = false }
+
+        do {
+            try PortfolioCSVExporter.export(accounts: accounts, to: url)
+            exportAlert = ExportAlert(
+                title: "Export Complete",
+                message: "Portfolio exported to \(url.lastPathComponent)."
+            )
+        } catch {
+            exportAlert = ExportAlert(
+                title: "Export Failed",
+                message: error.localizedDescription
+            )
+        }
+    }
 
     private func normalizeSortOrderIfNeeded() {
         let orders = accounts.map(\.sortOrder)
@@ -456,6 +501,12 @@ struct AccountListView: View {
             await Task.yield()
         }
     }
+}
+
+private struct ExportAlert: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
 }
 
 private struct AccountDropIndicator: View {

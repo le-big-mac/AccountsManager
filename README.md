@@ -28,7 +28,6 @@ Current account sources:
 - The headline value is converted to GBP
 - Account detail shows:
   - per-currency balances
-  - recent transactions
 
 ### Investment accounts
 
@@ -37,7 +36,7 @@ Current account sources:
 - Mixed-currency accounts also show the original currency breakdown
 - For CSV-backed accounts, the CSV is the source of truth and can be re-imported
 - Holdings can show open P&L percentage when an average purchase price is available
-- Analyst targets are stored on each holding when available
+- Analyst targets are cached in shared security metadata when available
 
 ## Requirements
 
@@ -177,12 +176,37 @@ If the format changes in future, inspect:
 - `Accounts/Services/CSVParser.swift`
 - `Accounts/Services/PortfolioImportService.swift`
 
+## CSV Export
+
+The main window includes an `Export CSV` button that writes the current live portfolio state to one CSV file.
+
+Export columns:
+
+- `accountName`
+- `accountType`
+- `sourceType`
+- `name`
+- `assetClass`
+- `units`
+- `currency`
+- `averagePurchasePrice`
+- `ticker`
+- `isin`
+- `sedol`
+
+Notes:
+
+- investment holdings export one row per holding
+- investment cash exports as `assetClass = cash`, with the amount stored in `units`
+- bank balances also export as `assetClass = cash`, one row per currency balance
+- the extra account/source columns are informational; the current generic importer ignores them
+
 ## Analyst Targets
 
 Analyst targets are optional enrichment for holdings with a ticker and asset class `stock` or `etf`.
 
 - Source: Alpha Vantage `OVERVIEW`
-- Stored on each holding and reused until stale
+- Stored in shared security metadata and reused until stale
 - Refreshed in the background rather than blocking price updates
 - Throttled and budgeted to fit the Alpha Vantage free-tier daily cap
 
