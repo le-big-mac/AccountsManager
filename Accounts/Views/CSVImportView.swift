@@ -11,6 +11,8 @@ struct CSVImportView: View {
     @State private var parsedURL: URL?
     @State private var error: String?
     @State private var isDragging = false
+    @State private var isParsing = false
+    @State private var isImporting = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -42,6 +44,11 @@ struct CSVImportView: View {
 
             Button("Choose File...") {
                 openFilePicker()
+            }
+            .disabled(isParsing)
+
+            if isParsing {
+                ProgressView()
             }
 
             if let error {
@@ -119,16 +126,20 @@ struct CSVImportView: View {
             HStack {
                 Spacer()
                 Button("Import") {
-                    if let parsedURL {
+                    guard let parsedURL else { return }
+                    isImporting = true
+                    Task {
                         do {
-                            _ = try PortfolioImportService.importCSV(at: parsedURL, into: account)
+                            _ = try await PortfolioImportService.importCSV(at: parsedURL, into: account)
                             dismiss()
                         } catch {
                             self.error = error.localizedDescription
                         }
+                        isImporting = false
                     }
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(isImporting)
             }
         }
         .padding()
@@ -156,13 +167,16 @@ struct CSVImportView: View {
     }
 
     private func parseFile(_ url: URL) {
-        do {
-            let parser = CSVParser()
-            parsedCSV = try parser.parse(url: url)
-            parsedURL = url
-            error = nil
-        } catch {
-            self.error = error.localizedDescription
+        isParsing = true
+        Task {
+            do {
+                parsedCSV = try await PortfolioImportService.parseCSV(at: url)
+                parsedURL = url
+                error = nil
+            } catch {
+                self.error = error.localizedDescription
+            }
+            isParsing = false
         }
     }
 }

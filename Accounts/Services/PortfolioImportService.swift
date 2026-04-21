@@ -1,9 +1,15 @@
 import Foundation
 
-@MainActor
 enum PortfolioImportService {
-    static func importCSV(at url: URL, into account: Account, rememberSource: Bool = true) throws -> CSVParser.ParsedCSV {
-        let parsed = try CSVParser().parse(url: url)
+    static func parseCSV(at url: URL) async throws -> CSVParser.ParsedCSV {
+        try await Task.detached(priority: .userInitiated) {
+            try CSVParser().parse(url: url)
+        }.value
+    }
+
+    @MainActor
+    static func importCSV(at url: URL, into account: Account, rememberSource: Bool = true) async throws -> CSVParser.ParsedCSV {
+        let parsed = try await parseCSV(at: url)
         importSnapshot(parsed, into: account)
 
         if rememberSource {
@@ -16,14 +22,16 @@ enum PortfolioImportService {
         return parsed
     }
 
-    static func refreshLinkedCSV(for account: Account) {
+    @MainActor
+    static func refreshLinkedCSV(for account: Account) async {
         guard account.investmentSourceType == .csvFile,
               let path = account.csvSourcePath,
               !path.isEmpty else { return }
 
-        _ = try? importCSV(at: URL(fileURLWithPath: path), into: account, rememberSource: true)
+        _ = try? await importCSV(at: URL(fileURLWithPath: path), into: account, rememberSource: true)
     }
 
+    @MainActor
     static func importSnapshot(
         _ parsed: CSVParser.ParsedCSV,
         into account: Account,
@@ -47,6 +55,7 @@ enum PortfolioImportService {
         }
     }
 
+    @MainActor
     private static func importHoldings(_ holdings: [ParsedHolding], into account: Account) {
         let activeKeys = Set(holdings.map(holdingKey))
 
@@ -84,6 +93,7 @@ enum PortfolioImportService {
         }
     }
 
+    @MainActor
     private static func importCashBalances(
         _ cashBalances: [ParsedCashBalance],
         into account: Account,

@@ -173,7 +173,7 @@ struct AccountDetailView: View {
             return
         }
 
-        PortfolioImportService.refreshLinkedCSV(for: account)
+        await PortfolioImportService.refreshLinkedCSV(for: account)
         await PriceService.shared.refreshHoldings(account.holdings)
         await PriceService.shared.refreshCashBalances(account.cashBalances)
     }

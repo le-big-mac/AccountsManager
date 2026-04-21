@@ -29,6 +29,7 @@ enum SnapTradeImportService {
             cashFirst: true,
             preserveExistingCashWhenEmpty: true
         )
+        await Task.yield()
 
         updateHoldingPrices(from: positions, in: account)
         account.snapTradeSyncedAt = Date()

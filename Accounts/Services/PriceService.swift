@@ -215,7 +215,10 @@ final class PriceService {
     }
 
     func refreshHoldings(_ holdings: [Holding]) async {
-        for holding in holdings {
+        for (index, holding) in holdings.enumerated() {
+            if index.isMultiple(of: 4) {
+                await Task.yield()
+            }
             _ = securityMetadata(for: holding)
             do {
                 let quote: CachedQuote
@@ -488,7 +491,10 @@ final class PriceService {
     }
 
     func refreshCashBalances(_ cashBalances: [CashBalance]) async {
-        for cash in cashBalances {
+        for (index, cash) in cashBalances.enumerated() {
+            if index.isMultiple(of: 8) {
+                await Task.yield()
+            }
             do {
                 let fxRate = try await fetchFXRateToGBP(from: cash.currency)
                 cash.fxRateToGBP = fxRate

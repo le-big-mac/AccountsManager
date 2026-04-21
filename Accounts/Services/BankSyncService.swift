@@ -14,7 +14,10 @@ enum BankSyncService {
         var totalGBP: Decimal = 0
         var activeBalanceIds = Set<String>()
 
-        for id in ids {
+        for (index, id) in ids.enumerated() {
+            if index.isMultiple(of: 2) {
+                await Task.yield()
+            }
             guard let balance = try? await TrueLayerService.shared.fetchBalanceSnapshot(
                 accountId: id,
                 accessToken: accessToken

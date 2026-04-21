@@ -18,7 +18,7 @@ enum CSVPlatformFormat: String {
     }
 }
 
-struct ParsedHolding {
+struct ParsedHolding: Sendable {
     let name: String
     let ticker: String?
     let isin: String?
@@ -29,7 +29,7 @@ struct ParsedHolding {
     let averagePurchasePrice: Decimal?
 }
 
-struct ParsedCashBalance {
+struct ParsedCashBalance: Sendable {
     let name: String
     let amount: Decimal
     let currency: String
@@ -38,7 +38,7 @@ struct ParsedCashBalance {
 
 struct CSVParser {
 
-    struct ParsedCSV {
+    struct ParsedCSV: Sendable {
         let headers: [String]
         let rows: [[String]]
         let detectedFormat: CSVPlatformFormat

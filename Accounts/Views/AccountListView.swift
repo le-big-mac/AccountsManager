@@ -332,10 +332,11 @@ struct AccountListView: View {
         // Refresh investment prices
         for account in accounts where account.accountType == .investment {
             if account.investmentSourceType == .csvFile {
-                PortfolioImportService.refreshLinkedCSV(for: account)
+                await PortfolioImportService.refreshLinkedCSV(for: account)
             } else if account.investmentSourceType == .snapTrade {
                 try? await SnapTradeImportService.sync(account: account, refreshConnection: true)
             }
+            await Task.yield()
         }
 
         let investmentHoldings = accounts
@@ -359,6 +360,7 @@ struct AccountListView: View {
             } catch {
                 continue
             }
+            await Task.yield()
         }
     }
 }
