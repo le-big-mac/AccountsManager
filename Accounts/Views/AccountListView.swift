@@ -30,6 +30,7 @@ struct AccountListView: View {
             ScrollViewReader { proxy in
                 sidebarContent(proxy: proxy)
                 .focusable()
+                .focusEffectDisabled()
                 .focused($isSidebarFocused)
                 .contentShape(Rectangle())
                 .onTapGesture {
