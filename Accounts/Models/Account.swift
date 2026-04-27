@@ -13,6 +13,18 @@ enum InvestmentSourceType: String {
     }
 }
 
+enum TrueLayerResourceType: String {
+    case account
+    case card
+
+    var displayName: String {
+        switch self {
+        case .account: "Bank Account"
+        case .card: "Credit Card"
+        }
+    }
+}
+
 @Model
 final class Account {
     var id: UUID
@@ -21,6 +33,7 @@ final class Account {
     var trueLayerAccountId: String?    // comma-separated for multiple accounts
     var trueLayerRefreshToken: String?  // per-account refresh token
     var trueLayerProvider: String?     // provider_id when available, otherwise display name -- used to filter
+    var trueLayerResourceTypeRaw: String?
     var investmentSourceTypeRaw: String?
     var csvSourcePath: String?
     var csvSourceFormatRaw: String?
@@ -56,6 +69,11 @@ final class Account {
     var investmentSourceType: InvestmentSourceType? {
         get { investmentSourceTypeRaw.flatMap(InvestmentSourceType.init(rawValue:)) }
         set { investmentSourceTypeRaw = newValue?.rawValue }
+    }
+
+    var trueLayerResourceType: TrueLayerResourceType {
+        get { trueLayerResourceTypeRaw.flatMap(TrueLayerResourceType.init(rawValue:)) ?? .account }
+        set { trueLayerResourceTypeRaw = newValue.rawValue }
     }
 
     var currentBalance: Decimal {

@@ -51,7 +51,7 @@ enum PortfolioCSVExporter {
                     [
                         account.name,
                         account.accountType.rawValue,
-                        "trueLayer",
+                        account.trueLayerResourceType == .card ? "trueLayerCard" : "trueLayer",
                         balance.effectiveDisplayName,
                         HoldingAssetClass.cash.rawValue,
                         decimalString(balance.amount),
@@ -74,7 +74,7 @@ enum PortfolioCSVExporter {
             return [[
                 account.name,
                 account.accountType.rawValue,
-                "trueLayer",
+                account.trueLayerResourceType == .card ? "trueLayerCard" : "trueLayer",
                 account.name,
                 HoldingAssetClass.cash.rawValue,
                 decimalString(latestBalance.amount),

@@ -8,14 +8,14 @@ enum AccountType: String, Codable, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .bankAccount: "Bank Account"
+        case .bankAccount: "Bank / Credit Card"
         case .investment: "Investment"
         }
     }
 
     var description: String {
         switch self {
-        case .bankAccount: "Auto-syncs balance via Open Banking (TrueLayer)"
+        case .bankAccount: "Auto-syncs balances and credit card bills via Open Banking (TrueLayer)"
         case .investment: "Track holdings with live prices (CSV import or SnapTrade)"
         }
     }

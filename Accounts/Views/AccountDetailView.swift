@@ -14,13 +14,13 @@ struct AccountDetailView: View {
             VStack(alignment: .leading, spacing: 20) {
                 // Header
                 HStack {
-                    Image(systemName: account.accountType.sfSymbol)
+                    Image(systemName: accountIcon)
                         .font(.title2)
-                        .foregroundStyle(account.accountType.defaultColor)
+                        .foregroundStyle(accountColor)
                     VStack(alignment: .leading) {
                         Text(account.name)
                             .font(.title2.bold())
-                        Text(account.accountType.displayName)
+                        Text(accountDisplayName)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -47,12 +47,12 @@ struct AccountDetailView: View {
                         Button {
                             showingBankConnection = true
                         } label: {
-                            Label("Connect Bank Account", systemImage: "building.columns.fill")
+                            Label("Connect Account or Card", systemImage: "building.columns.fill")
                         }
                         .buttonStyle(.borderedProminent)
                     } else {
                         HStack {
-                            Label("Connected via Open Banking", systemImage: "checkmark.circle.fill")
+                            Label("Connected via TrueLayer", systemImage: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
                             Spacer()
                             Button {
@@ -79,6 +79,27 @@ struct AccountDetailView: View {
         .sheet(isPresented: $showingSnapTradeConnection) {
             SnapTradeConnectionView(account: account)
         }
+    }
+
+    private var accountDisplayName: String {
+        if account.accountType == .bankAccount {
+            return account.trueLayerResourceType.displayName
+        }
+        return account.accountType.displayName
+    }
+
+    private var accountIcon: String {
+        if account.accountType == .bankAccount && account.trueLayerResourceType == .card {
+            return "creditcard.fill"
+        }
+        return account.accountType.sfSymbol
+    }
+
+    private var accountColor: Color {
+        if account.accountType == .bankAccount && account.trueLayerResourceType == .card {
+            return .red
+        }
+        return account.accountType.defaultColor
     }
 
     private var refreshLabel: String {
@@ -125,7 +146,7 @@ struct AccountDetailView: View {
     @ViewBuilder
     private var bankHoldingsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Current Balances")
+            Text(account.trueLayerResourceType == .card ? "Outstanding Balance" : "Current Balances")
                 .font(.headline)
 
             let sorted = account.bankBalances.sorted { lhs, rhs in

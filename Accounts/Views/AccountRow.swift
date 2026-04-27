@@ -6,8 +6,8 @@ struct AccountRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: account.accountType.sfSymbol)
-                .foregroundStyle(account.accountType.defaultColor)
+            Image(systemName: iconName)
+                .foregroundStyle(iconColor)
                 .frame(width: 20)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -38,5 +38,19 @@ struct AccountRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    private var iconName: String {
+        if account.accountType == .bankAccount && account.trueLayerResourceType == .card {
+            return "creditcard.fill"
+        }
+        return account.accountType.sfSymbol
+    }
+
+    private var iconColor: Color {
+        if account.accountType == .bankAccount && account.trueLayerResourceType == .card {
+            return .red
+        }
+        return account.accountType.defaultColor
     }
 }

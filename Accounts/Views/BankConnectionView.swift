@@ -11,38 +11,25 @@ struct BankConnectionView: View {
 
     @State private var status: ConnectionStatus = .ready
     @State private var error: String?
-    @State private var bankAccounts: [TrueLayerService.BankAccount] = []
+    @State private var linkedResources: [TrueLayerService.LinkedResource] = []
     @State private var balancePreviews: [String: TrueLayerService.BalanceSnapshot] = [:]
     @State private var accessToken: String?
     @State private var expectedState: String?
 
-    /// Provider names already connected to other accounts in the app
-    private var alreadyConnectedProviders: Set<String> {
-        var providers = Set<String>()
+    private var alreadyConnectedResourceIds: Set<String> {
+        var resourceIds = Set<String>()
         for a in allAccounts where a.id != account.id {
-            if let provider = a.trueLayerProvider {
-                providers.insert(normalizedProviderKey(provider))
+            if let ids = a.trueLayerAccountId {
+                for id in ids.split(separator: ",").map(String.init) {
+                    resourceIds.insert(id)
+                }
             }
         }
-        return providers
+        return resourceIds
     }
 
-    private func normalizedProviderKey(_ provider: String) -> String {
-        provider.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-    }
-
-    private func providerKeys(for bankAccount: TrueLayerService.BankAccount) -> Set<String> {
-        [
-            bankAccount.provider?.providerId,
-            bankAccount.provider?.displayName,
-        ]
-        .compactMap { $0 }
-        .map(normalizedProviderKey)
-        .reduce(into: Set<String>()) { $0.insert($1) }
-    }
-
-    private func providerStorageValue(for bankAccount: TrueLayerService.BankAccount) -> String? {
-        bankAccount.provider?.providerId ?? bankAccount.provider?.displayName
+    private func providerStorageValue(for resource: TrueLayerService.LinkedResource) -> String? {
+        resource.provider?.providerId ?? resource.provider?.displayName
     }
 
     enum ConnectionStatus {
@@ -98,16 +85,16 @@ struct BankConnectionView: View {
                 .font(.system(size: 40))
                 .foregroundStyle(.blue)
 
-            Text("Connect your bank account via Open Banking")
+            Text("Connect via Open Banking")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
 
-            Text("You'll be redirected to select your bank and log in. TrueLayer is FCA-regulated. Read-only access, 90-day consent.")
+            Text("You'll be redirected to select your provider and log in. Bank accounts and supported credit cards can be connected.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
 
-            Button("Connect Bank Account") {
+            Button("Connect Account or Card") {
                 Task { await openTrueLayerAuth() }
             }
             .buttonStyle(.borderedProminent)
@@ -131,54 +118,64 @@ struct BankConnectionView: View {
 
     private var accountSelectionView: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("\(bankAccounts.count) accounts found")
+            Text("\(linkedResources.count) accounts and cards found")
                 .font(.headline)
 
             // Connect all button
-            Button {
-                connectAllAccounts()
-            } label: {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Connect all accounts")
-                            .font(.subheadline.weight(.medium))
-                        Text("Balances will be summed together")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+            if canConnectAllResources {
+                Button {
+                    connectAllResources()
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Connect all \(resourceTypeLabelPlural)")
+                                .font(.subheadline.weight(.medium))
+                            Text("Balances will be summed together")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if !balancePreviews.isEmpty {
+                            Text(previewBreakdown)
+                                .font(.subheadline.weight(.semibold).monospacedDigit())
+                        }
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
                     }
-                    Spacer()
-                    if !balancePreviews.isEmpty {
-                        Text(previewBreakdown)
-                            .font(.subheadline.weight(.semibold).monospacedDigit())
-                    }
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 10)
+                    .background(.blue.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 10)
-                .background(.blue.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
 
             Divider()
 
-            Text("Or select one:")
+            Text(canConnectAllResources ? "Or select one:" : "Select one:")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             ScrollView {
                 LazyVStack(spacing: 4) {
-                    ForEach(bankAccounts) { bankAccount in
+                    ForEach(linkedResources) { resource in
                         Button {
-                            selectAccount(bankAccount)
+                            selectResource(resource)
                         } label: {
                             HStack {
-                                Text(bankAccount.label)
-                                    .foregroundStyle(.primary)
-                                    .font(.subheadline)
+                                Image(systemName: resource.resourceType == .card ? "creditcard.fill" : "building.columns.fill")
+                                    .foregroundStyle(resource.resourceType == .card ? .red : .blue)
+                                    .frame(width: 18)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(resource.label)
+                                        .foregroundStyle(.primary)
+                                        .font(.subheadline)
+                                    Text(resource.resourceType.displayName)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
                                 Spacer()
-                                if let balance = balancePreviews[bankAccount.accountId] {
+                                if let balance = balancePreviews[resource.resourceId] {
                                     Text(balance.amount.formattedCurrency(code: balance.currency))
                                         .font(.subheadline.monospacedDigit())
                                         .foregroundStyle(.secondary)
@@ -250,37 +247,43 @@ struct BankConnectionView: View {
             }
             account.trueLayerRefreshToken = refresh
 
-            let allBankAccounts = try await TrueLayerService.shared.listAccounts(accessToken: tokenPair.accessToken)
-            log("Returned \(allBankAccounts.count) accounts:")
-            for ba in allBankAccounts {
-                log("  - id=\(ba.accountId.prefix(16))... providerId=\(ba.provider?.providerId ?? "nil") provider=\(ba.provider?.displayName ?? "nil") type=\(ba.accountType ?? "nil") name=\(ba.displayName ?? "nil")")
+            let allResources = try await TrueLayerService.shared.listLinkedResources(accessToken: tokenPair.accessToken)
+            log("Returned \(allResources.count) TrueLayer resources:")
+            for resource in allResources {
+                log("  - id=\(resource.resourceId.prefix(16))... type=\(resource.resourceType.rawValue) providerId=\(resource.provider?.providerId ?? "nil") provider=\(resource.provider?.displayName ?? "nil") name=\(resource.label)")
             }
 
-            // Filter out accounts from providers already connected
-            let excluded = alreadyConnectedProviders
-            log("Already connected providers: \(excluded)")
-            bankAccounts = allBankAccounts.filter { ba in
-                let keys = providerKeys(for: ba)
-                guard !keys.isEmpty else { return true }
-                return excluded.isDisjoint(with: keys)
+            let excluded = alreadyConnectedResourceIds
+            log("Already connected resource IDs: \(excluded)")
+            linkedResources = allResources.filter { resource in
+                !excluded.contains(resource.resourceId)
             }
-            log("After filtering: \(bankAccounts.count) accounts")
+            log("After filtering: \(linkedResources.count) resources")
 
-            if bankAccounts.isEmpty {
-                error = "No new accounts found. All banks are already connected."
+            if linkedResources.isEmpty {
+                error = "No new accounts or cards found. Everything returned by TrueLayer is already connected."
                 status = .ready
-            } else if bankAccounts.count == 1 {
-                selectAccount(bankAccounts[0])
+            } else if linkedResources.count == 1 {
+                selectResource(linkedResources[0])
             } else {
                 status = .selectingAccount
                 // Fetch balance previews in background
-                for ba in bankAccounts {
+                for resource in linkedResources {
                     Task {
-                        if let balance = try? await TrueLayerService.shared.fetchBalanceSnapshot(
-                            accountId: ba.accountId, accessToken: tokenPair.accessToken
-                        ) {
-                            balancePreviews[ba.accountId] = balance
+                        let balance: TrueLayerService.BalanceSnapshot?
+                        switch resource.resourceType {
+                        case .account:
+                            balance = try? await TrueLayerService.shared.fetchBalanceSnapshot(
+                                accountId: resource.resourceId,
+                                accessToken: tokenPair.accessToken
+                            )
+                        case .card:
+                            balance = try? await TrueLayerService.shared.fetchCardBalanceSnapshot(
+                                cardId: resource.resourceId,
+                                accessToken: tokenPair.accessToken
+                            )
                         }
+                        if let balance { balancePreviews[resource.resourceId] = balance }
                     }
                 }
             }
@@ -289,26 +292,41 @@ struct BankConnectionView: View {
         }
     }
 
-    private func connectAllAccounts() {
-        let allIds = bankAccounts.map { $0.accountId }.joined(separator: ",")
-        account.trueLayerAccountId = allIds
-        account.trueLayerProvider = bankAccounts.first.flatMap(providerStorageValue)
-        status = .connected
+    private var canConnectAllResources: Bool {
+        guard let first = linkedResources.first?.resourceType else { return false }
+        return linkedResources.allSatisfy { $0.resourceType == first }
+    }
 
-        Task {
-            guard let token = accessToken else { return }
-            await BankSyncService.sync(account: account, accessToken: token, knownAccounts: bankAccounts)
+    private var resourceTypeLabelPlural: String {
+        switch linkedResources.first?.resourceType {
+        case .account: "accounts"
+        case .card: "cards"
+        case nil: "resources"
         }
     }
 
-    private func selectAccount(_ bankAccount: TrueLayerService.BankAccount) {
-        account.trueLayerAccountId = bankAccount.accountId
-        account.trueLayerProvider = providerStorageValue(for: bankAccount)
+    private func connectAllResources() {
+        let allIds = linkedResources.map { $0.resourceId }.joined(separator: ",")
+        account.trueLayerAccountId = allIds
+        account.trueLayerResourceType = linkedResources.first?.resourceType ?? .account
+        account.trueLayerProvider = linkedResources.first.flatMap(providerStorageValue)
         status = .connected
 
         Task {
             guard let token = accessToken else { return }
-            await BankSyncService.sync(account: account, accessToken: token, knownAccounts: [bankAccount])
+            await BankSyncService.sync(account: account, accessToken: token, knownResources: linkedResources)
+        }
+    }
+
+    private func selectResource(_ resource: TrueLayerService.LinkedResource) {
+        account.trueLayerAccountId = resource.resourceId
+        account.trueLayerResourceType = resource.resourceType
+        account.trueLayerProvider = providerStorageValue(for: resource)
+        status = .connected
+
+        Task {
+            guard let token = accessToken else { return }
+            await BankSyncService.sync(account: account, accessToken: token, knownResources: [resource])
         }
     }
 }

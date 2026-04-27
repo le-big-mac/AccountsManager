@@ -4,7 +4,7 @@ Native macOS SwiftUI app for tracking personal cash and investments in one place
 
 ## What It Does
 
-- Tracks UK bank accounts through TrueLayer Open Banking
+- Tracks UK bank accounts and supported credit cards through TrueLayer Open Banking
 - Tracks investment accounts from either:
   - CSV files as the account source of truth
   - SnapTrade sync for supported brokerages
@@ -15,7 +15,7 @@ Native macOS SwiftUI app for tracking personal cash and investments in one place
 
 Current account sources:
 
-- `TrueLayer`: bank/current accounts
+- `TrueLayer`: bank/current accounts and supported credit cards
 - `CSV File`: investment and fund accounts
 - `SnapTrade`: supported brokerage investment accounts
 
@@ -28,6 +28,13 @@ Current account sources:
 - The headline value is converted to GBP
 - Account detail shows:
   - per-currency balances
+
+### Credit cards
+
+- A TrueLayer card connection is stored as one app account
+- Card balances are treated as liabilities and stored as negative balances
+- The headline value reduces net worth in the same way as other negative cash balances
+- The connection flow is shared with bank accounts, using the provider's normal authentication and 2FA
 
 ### Investment accounts
 
@@ -199,6 +206,7 @@ Notes:
 - investment holdings export one row per holding
 - investment cash exports as `assetClass = cash`, with the amount stored in `units`
 - bank balances also export as `assetClass = cash`, one row per currency balance
+- TrueLayer credit card balances export as cash liability rows, with negative values in `units`
 - the extra account/source columns are informational; the current generic importer ignores them
 
 ## Analyst Targets

@@ -5,11 +5,11 @@ enum BankSyncService {
     static func sync(
         account: Account,
         accessToken: String,
-        knownAccounts: [TrueLayerService.BankAccount] = []
+        knownResources: [TrueLayerService.LinkedResource] = []
     ) async {
         guard let accountIds = account.trueLayerAccountId else { return }
         let ids = accountIds.split(separator: ",").map(String.init)
-        let knownById = Dictionary(uniqueKeysWithValues: knownAccounts.map { ($0.accountId, $0) })
+        let knownById = Dictionary(uniqueKeysWithValues: knownResources.map { ($0.resourceId, $0) })
 
         var totalGBP: Decimal = 0
         var activeBalanceIds = Set<String>()
@@ -18,15 +18,26 @@ enum BankSyncService {
             if index.isMultiple(of: 2) {
                 await Task.yield()
             }
-            guard let balance = try? await TrueLayerService.shared.fetchBalanceSnapshot(
-                accountId: id,
-                accessToken: accessToken
-            ) else {
+            let balance: TrueLayerService.BalanceSnapshot?
+            switch account.trueLayerResourceType {
+            case .account:
+                balance = try? await TrueLayerService.shared.fetchBalanceSnapshot(
+                    accountId: id,
+                    accessToken: accessToken
+                )
+            case .card:
+                balance = try? await TrueLayerService.shared.fetchCardBalanceSnapshot(
+                    cardId: id,
+                    accessToken: accessToken
+                )
+            }
+
+            guard let balance else {
                 continue
             }
 
             let fxRate = (try? await PriceService.shared.fetchFXRateToGBP(from: balance.currency)) ?? 0
-            let displayName = displayName(for: knownById[id], fallbackId: id, currency: balance.currency)
+            let displayName = displayName(for: knownById[id], type: account.trueLayerResourceType, currency: balance.currency)
             activeBalanceIds.insert(id)
             totalGBP += balance.amount * fxRate
 
@@ -56,13 +67,18 @@ enum BankSyncService {
     }
 
     private static func displayName(
-        for bankAccount: TrueLayerService.BankAccount?,
-        fallbackId _: String,
+        for resource: TrueLayerService.LinkedResource?,
+        type: TrueLayerResourceType,
         currency: String
     ) -> String {
-        if let label = bankAccount?.label {
+        if let label = resource?.label {
             return label
         }
-        return "\(currency) Balance"
+        switch type {
+        case .account:
+            return "\(currency) Balance"
+        case .card:
+            return "\(currency) Card Balance"
+        }
     }
 }

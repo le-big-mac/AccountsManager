@@ -36,7 +36,7 @@ actor TrueLayerService {
         let providerId: String?
     }
 
-    /// Build the auth URL targeting a specific bank provider.
+    /// Build the auth URL targeting a specific provider.
     func buildAuthURL(providerId: String? = nil, redirectURI: String = "accounts://truelayer-callback") -> AuthRequest? {
         guard let clientId = KeychainHelper.load(.trueLayerClientId) else { return nil }
 
@@ -47,7 +47,7 @@ actor TrueLayerService {
         components.queryItems = [
             URLQueryItem(name: "response_type", value: "code"),
             URLQueryItem(name: "client_id", value: clientId),
-            URLQueryItem(name: "scope", value: "accounts balance transactions info offline_access"),
+            URLQueryItem(name: "scope", value: "accounts cards balance info offline_access"),
             URLQueryItem(name: "redirect_uri", value: redirectURI),
             URLQueryItem(name: "providers", value: providers),
             URLQueryItem(name: "state", value: state),
@@ -162,6 +162,46 @@ actor TrueLayerService {
         return accountsResponse.results
     }
 
+    func listCards(accessToken: String) async throws -> [CardAccount] {
+        let url = URL(string: "\(apiBaseURL)/cards")!
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+
+        let (data, response) = try await session.data(for: request)
+        logDataResponse("cards", response: response, data: data)
+        try validateHTTPResponse(response, data: data)
+        let cardsResponse = try JSONDecoder().decode(CardsResponse.self, from: data)
+        return cardsResponse.results
+    }
+
+    func listLinkedResources(accessToken: String) async throws -> [LinkedResource] {
+        var resources: [LinkedResource] = []
+        var errors: [Error] = []
+
+        do {
+            let accounts = try await listAccounts(accessToken: accessToken)
+            resources.append(contentsOf: accounts.map(LinkedResource.init(bankAccount:)))
+        } catch {
+            errors.append(error)
+        }
+
+        do {
+            let cards = try await listCards(accessToken: accessToken)
+            resources.append(contentsOf: cards.map(LinkedResource.init(card:)))
+        } catch {
+            errors.append(error)
+        }
+
+        if resources.isEmpty, let error = errors.first {
+            throw error
+        }
+
+        return resources
+    }
+
     func fetchBalanceSnapshot(accountId: String, accessToken: String) async throws -> BalanceSnapshot {
         let url = URL(string: "\(apiBaseURL)/accounts/\(accountId)/balance")!
         var request = URLRequest(url: url)
@@ -192,6 +232,40 @@ actor TrueLayerService {
 
         return BalanceSnapshot(
             accountId: accountId,
+            amount: amount,
+            currency: normalizedCurrency(balance.currency)
+        )
+    }
+
+    func fetchCardBalanceSnapshot(cardId: String, accessToken: String) async throws -> BalanceSnapshot {
+        let url = URL(string: "\(apiBaseURL)/cards/\(cardId)/balance")!
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+
+        let (data, response) = try await session.data(for: request)
+        try validateHTTPResponse(response, data: data)
+        let balancesResponse = try JSONDecoder().decode(BalancesResponse.self, from: data)
+
+        guard let balance = balancesResponse.results.first else {
+            throw TrueLayerError.noBalance
+        }
+
+        let amount: Decimal
+        if let current = balance.current {
+            amount = -abs(current)
+        } else if let paymentDue = balance.paymentDue {
+            amount = -abs(paymentDue)
+        } else if let currentMinor = balance.currentBalanceInMinor {
+            amount = -abs(Decimal(currentMinor) / 100)
+        } else {
+            throw TrueLayerError.noBalance
+        }
+
+        return BalanceSnapshot(
+            accountId: cardId,
             amount: amount,
             currency: normalizedCurrency(balance.currency)
         )
@@ -275,6 +349,34 @@ actor TrueLayerService {
         let results: [BankAccount]
     }
 
+    struct CardsResponse: Decodable {
+        let results: [CardAccount]
+    }
+
+    struct LinkedResource: Identifiable {
+        let id: String
+        let resourceId: String
+        let resourceType: TrueLayerResourceType
+        let label: String
+        let provider: AccountProvider?
+
+        init(bankAccount: BankAccount) {
+            self.id = "account:\(bankAccount.accountId)"
+            self.resourceId = bankAccount.accountId
+            self.resourceType = .account
+            self.label = bankAccount.label
+            self.provider = bankAccount.provider
+        }
+
+        init(card: CardAccount) {
+            self.id = "card:\(card.cardId)"
+            self.resourceId = card.cardId
+            self.resourceType = .card
+            self.label = card.label
+            self.provider = card.provider
+        }
+    }
+
     struct BankAccount: Decodable, Identifiable {
         let accountId: String
         let accountType: String?
@@ -321,6 +423,62 @@ actor TrueLayerService {
         }
     }
 
+    struct CardAccount: Decodable, Identifiable {
+        let cardId: String
+        let cardType: String?
+        let displayName: String?
+        let currency: String?
+        let partialCardNumber: String?
+        let provider: AccountProvider?
+
+        var id: String { cardId }
+
+        var label: String {
+            var parts: [String] = []
+            if let displayName, !displayName.isEmpty {
+                parts.append(displayName)
+            } else if let cardType {
+                parts.append(cardType.capitalized)
+            } else {
+                parts.append("Credit Card")
+            }
+            if let currency { parts.append(currency) }
+            if let partialCardNumber, !partialCardNumber.isEmpty {
+                parts.append("••\(partialCardNumber.suffix(4))")
+            }
+            return parts.joined(separator: " · ")
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case accountId = "account_id"
+            case cardId = "card_id"
+            case cardType = "card_type"
+            case displayName = "display_name"
+            case currency
+            case partialCardNumber = "partial_card_number"
+            case provider
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            if let accountId = try container.decodeIfPresent(String.self, forKey: .accountId) {
+                cardId = accountId
+            } else if let cardId = try container.decodeIfPresent(String.self, forKey: .cardId) {
+                self.cardId = cardId
+            } else {
+                throw DecodingError.keyNotFound(
+                    CodingKeys.accountId,
+                    DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Missing card account identifier")
+                )
+            }
+            cardType = try container.decodeIfPresent(String.self, forKey: .cardType)
+            displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+            currency = try container.decodeIfPresent(String.self, forKey: .currency)
+            partialCardNumber = try container.decodeIfPresent(String.self, forKey: .partialCardNumber)
+            provider = try container.decodeIfPresent(AccountProvider.self, forKey: .provider)
+        }
+    }
+
     struct AccountProvider: Decodable {
         let displayName: String?
         let providerId: String?
@@ -338,6 +496,7 @@ actor TrueLayerService {
     struct BalanceResult: Decodable {
         let current: Decimal?
         let available: Decimal?
+        let paymentDue: Decimal?
         let currency: String?
         let currentBalanceInMinor: Int?
         let availableBalanceInMinor: Int?
@@ -345,6 +504,7 @@ actor TrueLayerService {
         enum CodingKeys: String, CodingKey {
             case current
             case available
+            case paymentDue = "payment_due"
             case currency
             case currentBalanceInMinor = "current_balance_in_minor"
             case availableBalanceInMinor = "available_balance_in_minor"
