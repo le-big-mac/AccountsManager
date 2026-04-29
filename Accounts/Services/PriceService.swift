@@ -5,17 +5,15 @@ final class PriceService {
     static let shared = PriceService()
 
     private let stableBaseURL = "https://financialmodelingprep.com/stable"
-    private let alphaVantageBaseURL = "https://www.alphavantage.co/query"
     private var cache: [String: CachedQuote] = [:]
     private var fxCache: [String: CachedFXRate] = [:]
-    private var analystTargetCache: [String: CachedAnalystTarget] = [:]
+    private var analystRatingCache: [String: CachedAnalystRating] = [:]
     private var securityMetadataCache: [String: SecurityMetadata] = [:]
     private var vanguardProductsCache: [VanguardProduct]?
-    private var analystTargetRefreshTask: Task<Void, Never>?
-    private var queuedAnalystTargetTickers: Set<String> = []
-    private var refreshedAnalystTargetTickers: Set<String> = []
-    private var pendingAnalystTargetHoldings: [Holding] = []
-    private var lastAlphaVantageRequestAt: Date?
+    private var analystRatingRefreshTask: Task<Void, Never>?
+    private var queuedAnalystRatingTickers: Set<String> = []
+    private var refreshedAnalystRatingTickers: Set<String> = []
+    private var pendingAnalystRatingHoldings: [Holding] = []
 
     struct CachedQuote {
         let price: Decimal
@@ -30,11 +28,11 @@ final class PriceService {
         let fetchedAt: Date
     }
 
-    struct CachedAnalystTarget {
-        let consensus: Decimal?
-        let low: Decimal?
-        let high: Decimal?
-        let currency: String
+    struct CachedAnalystRating {
+        let consensus: String
+        let score: Decimal?
+        let count: Int?
+        let sourceUpdatedAt: Date?
         let fetchedAt: Date
     }
 
@@ -140,10 +138,6 @@ final class PriceService {
 
     private var apiKey: String? {
         KeychainHelper.load(.fmpApiKey)
-    }
-
-    private var alphaVantageApiKey: String? {
-        KeychainHelper.load(.alphaVantageApiKey)
     }
 
     var isConfigured: Bool {
@@ -288,29 +282,27 @@ final class PriceService {
                 continue
             }
         }
-        scheduleAnalystTargetRefresh(holdings)
+        scheduleAnalystRatingRefresh(holdings)
     }
 
-    func scheduleAnalystTargetRefresh(_ holdings: [Holding]) {
-        guard alphaVantageApiKey != nil else { return }
-
+    func scheduleAnalystRatingRefresh(_ holdings: [Holding]) {
         for holding in holdings {
-            guard supportsAnalystTargets(for: holding),
-                  needsAnalystTargetRefresh(for: holding),
+            guard supportsAnalystRatings(for: holding),
+                  needsAnalystRatingRefresh(for: holding),
                   let ticker = holding.ticker,
                   !ticker.isEmpty,
-                  !queuedAnalystTargetTickers.contains(ticker),
-                  !refreshedAnalystTargetTickers.contains(ticker) else {
+                  !queuedAnalystRatingTickers.contains(ticker),
+                  !refreshedAnalystRatingTickers.contains(ticker) else {
                 continue
             }
-            queuedAnalystTargetTickers.insert(ticker)
-            pendingAnalystTargetHoldings.append(holding)
+            queuedAnalystRatingTickers.insert(ticker)
+            pendingAnalystRatingHoldings.append(holding)
         }
 
-        guard analystTargetRefreshTask == nil else { return }
-        analystTargetRefreshTask = Task { @MainActor in
-            defer { self.analystTargetRefreshTask = nil }
-            await self.refreshQueuedAnalystTargets()
+        guard analystRatingRefreshTask == nil else { return }
+        analystRatingRefreshTask = Task { @MainActor in
+            defer { self.analystRatingRefreshTask = nil }
+            await self.refreshQueuedAnalystRatings()
         }
     }
 
@@ -326,97 +318,67 @@ final class PriceService {
         }
     }
 
-    private func refreshQueuedAnalystTargets() async {
-        guard alphaVantageApiKey != nil else { return }
-
-        while !pendingAnalystTargetHoldings.isEmpty {
+    private func refreshQueuedAnalystRatings() async {
+        while !pendingAnalystRatingHoldings.isEmpty {
             guard !Task.isCancelled else { return }
-            guard canUseAlphaVantageRequestBudget() else { return }
-            let holding = pendingAnalystTargetHoldings.removeFirst()
+            let holding = pendingAnalystRatingHoldings.removeFirst()
             guard let ticker = holding.ticker else { continue }
-            queuedAnalystTargetTickers.remove(ticker)
+            queuedAnalystRatingTickers.remove(ticker)
 
-            guard supportsAnalystTargets(for: holding),
-                  needsAnalystTargetRefresh(for: holding) else {
+            guard supportsAnalystRatings(for: holding),
+                  needsAnalystRatingRefresh(for: holding) else {
                 continue
             }
 
+            let metadata = securityMetadata(for: holding)
             do {
-                let metadata = securityMetadata(for: holding)
-                if let target = try await fetchAnalystTarget(ticker: ticker, currency: holding.priceCurrency) {
-                    metadata.analystConsensusTarget = target.consensus
-                    metadata.analystTargetLow = target.low
-                    metadata.analystTargetHigh = target.high
-                    metadata.analystTargetCurrency = target.currency
-                    metadata.analystTargetUpdatedAt = Date()
-                    refreshedAnalystTargetTickers.insert(ticker)
-                } else if metadata.analystTargetUpdatedAt == nil {
-                    metadata.analystTargetUpdatedAt = Date()
-                    refreshedAnalystTargetTickers.insert(ticker)
-                }
+                let rating = try await fetchStockAnalysisRating(ticker: ticker)
+                metadata.analystConsensusRatingRaw = rating.consensus
+                metadata.analystRatingScore = rating.score
+                metadata.analystRatingCount = rating.count
+                metadata.analystRatingSource = "StockAnalysis"
+                metadata.analystRatingError = nil
+                metadata.analystRatingUpdatedAt = Date()
+                refreshedAnalystRatingTickers.insert(ticker)
             } catch {
-                if let priceError = error as? PriceError, priceError == .rateLimited {
-                    return
-                }
-                let metadata = securityMetadata(for: holding)
-                if metadata.analystConsensusTarget != nil || metadata.analystTargetLow != nil || metadata.analystTargetHigh != nil {
-                    metadata.analystTargetUpdatedAt = metadata.analystTargetUpdatedAt ?? Date()
-                    refreshedAnalystTargetTickers.insert(ticker)
-                }
+                metadata.analystRatingError = "Analyst rating refresh failed: \(error.localizedDescription)"
+                metadata.analystRatingUpdatedAt = metadata.analystRatingUpdatedAt ?? Date()
+                refreshedAnalystRatingTickers.insert(ticker)
             }
         }
     }
 
-    private func fetchAnalystTarget(ticker: String, currency: String) async throws -> CachedAnalystTarget? {
-        if let cached = analystTargetCache[ticker],
+    private func fetchStockAnalysisRating(ticker: String) async throws -> CachedAnalystRating {
+        let normalizedTicker = ticker.uppercased()
+        if let cached = analystRatingCache[normalizedTicker],
            Date().timeIntervalSince(cached.fetchedAt) < 21_600 {
             return cached
         }
 
-        guard let alphaVantageApiKey else { throw PriceError.notConfigured }
-        try await respectAlphaVantageThrottle()
+        let url = URL(string: "https://stockanalysis.com/stocks/\(normalizedTicker.lowercased())/forecast/")!
+        var request = URLRequest(url: url)
+        request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
 
-        var components = URLComponents(string: alphaVantageBaseURL)!
-        components.queryItems = [
-            URLQueryItem(name: "function", value: "OVERVIEW"),
-            URLQueryItem(name: "symbol", value: ticker),
-            URLQueryItem(name: "apikey", value: alphaVantageApiKey)
-        ]
-        let url = components.url!
-        let (data, _) = try await URLSession.shared.data(from: url)
-
-        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw PriceError.noData
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if let httpResponse = response as? HTTPURLResponse,
+           !(200..<300).contains(httpResponse.statusCode) {
+            throw PriceError.sourceUnavailable("StockAnalysis returned HTTP \(httpResponse.statusCode).")
+        }
+        guard let html = String(data: data, encoding: .utf8),
+              let recommendation = latestStockAnalysisRecommendation(from: html),
+              let consensus = recommendation["consensus"] as? String,
+              AnalystConsensusRating.from(consensus) != nil else {
+            throw PriceError.sourceUnavailable("StockAnalysis forecast page did not contain the expected analyst consensus data.")
         }
 
-        if object["Information"] != nil || object["Note"] != nil {
-            throw PriceError.rateLimited
-        }
-
-        let consensus = decimalString(object["AnalystTargetPrice"])
-        let low = decimalString(object["AnalystTargetLowPrice"])
-        let high = decimalString(object["AnalystTargetHighPrice"])
-        let responseCurrency = normalizedCurrency((object["Currency"] as? String) ?? currency)
-
-        guard consensus != nil || low != nil || high != nil else {
-            analystTargetCache[ticker] = CachedAnalystTarget(
-                consensus: nil,
-                low: nil,
-                high: nil,
-                currency: responseCurrency,
-                fetchedAt: Date()
-            )
-            return nil
-        }
-
-        let cached = CachedAnalystTarget(
+        let cached = CachedAnalystRating(
             consensus: consensus,
-            low: low,
-            high: high,
-            currency: responseCurrency,
+            score: decimal(from: recommendation["score"]),
+            count: int(from: recommendation["total"]),
+            sourceUpdatedAt: date(from: recommendation["updated"]),
             fetchedAt: Date()
         )
-        analystTargetCache[ticker] = cached
+        analystRatingCache[normalizedTicker] = cached
         return cached
     }
 
@@ -597,14 +559,14 @@ final class PriceService {
     func clearCache() {
         cache.removeAll()
         fxCache.removeAll()
-        analystTargetCache.removeAll()
+        analystRatingCache.removeAll()
         securityMetadataCache.removeAll()
-        queuedAnalystTargetTickers.removeAll()
-        refreshedAnalystTargetTickers.removeAll()
-        pendingAnalystTargetHoldings.removeAll()
+        queuedAnalystRatingTickers.removeAll()
+        refreshedAnalystRatingTickers.removeAll()
+        pendingAnalystRatingHoldings.removeAll()
     }
 
-    private func supportsAnalystTargets(for holding: Holding) -> Bool {
+    private func supportsAnalystRatings(for holding: Holding) -> Bool {
         switch holding.assetClass {
         case .stock, .etf:
             return holding.ticker != nil
@@ -613,9 +575,9 @@ final class PriceService {
         }
     }
 
-    private func needsAnalystTargetRefresh(for holding: Holding) -> Bool {
-        guard let updatedAt = securityMetadata(for: holding).analystTargetUpdatedAt else { return true }
-        return Date().timeIntervalSince(updatedAt) > 7 * 24 * 60 * 60
+    private func needsAnalystRatingRefresh(for holding: Holding) -> Bool {
+        guard let updatedAt = securityMetadata(for: holding).analystRatingUpdatedAt else { return true }
+        return Date().timeIntervalSince(updatedAt) > 24 * 60 * 60
     }
 
     private func securityMetadata(for holding: Holding) -> SecurityMetadata {
@@ -634,51 +596,6 @@ final class PriceService {
         holding.securityMetadata = metadata
         securityMetadataCache[key] = metadata
         return metadata
-    }
-
-    private func respectAlphaVantageThrottle() async throws {
-        let minimumInterval: TimeInterval = 12
-        if let lastAlphaVantageRequestAt {
-            let elapsed = Date().timeIntervalSince(lastAlphaVantageRequestAt)
-            if elapsed < minimumInterval {
-                let remaining = minimumInterval - elapsed
-                try await Task.sleep(for: .seconds(remaining))
-            }
-        }
-        lastAlphaVantageRequestAt = Date()
-    }
-
-    private func canUseAlphaVantageRequestBudget() -> Bool {
-        let defaults = UserDefaults.standard
-        let dayKey = "alphaVantage.requestDay"
-        let countKey = "alphaVantage.requestCount"
-        let today = alphaVantageDayString(for: Date())
-        let storedDay = defaults.string(forKey: dayKey)
-        var count = defaults.integer(forKey: countKey)
-
-        if storedDay != today {
-            defaults.set(today, forKey: dayKey)
-            count = 0
-        }
-
-        guard count < 25 else { return false }
-        defaults.set(count + 1, forKey: countKey)
-        return true
-    }
-
-    private func alphaVantageDayString(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
-    }
-
-    private func decimalString(_ value: Any?) -> Decimal? {
-        guard let value = value as? String else { return nil }
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed != "None" else { return nil }
-        return Decimal(string: trimmed)
     }
 
     private func normalizedCurrency(_ currency: String) -> String {
@@ -716,6 +633,131 @@ final class PriceService {
         }
     }
 
+    private func latestStockAnalysisRecommendation(from html: String) -> [String: Any]? {
+        guard let markerRange = html.range(of: "recommendations:[") else { return nil }
+        let start = html.index(markerRange.upperBound, offsetBy: -1)
+        guard let arrayText = balancedSubstring(in: html, from: start, open: "[", close: "]"),
+              let jsonData = quoteJavaScriptObjectKeys(arrayText).data(using: .utf8),
+              let recommendations = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]] else {
+            return nil
+        }
+        return recommendations.last
+    }
+
+    private func balancedSubstring(in text: String, from start: String.Index, open: Character, close: Character) -> String? {
+        guard text[start] == open else { return nil }
+        var depth = 0
+        var inString = false
+        var previous: Character?
+        var index = start
+
+        while index < text.endIndex {
+            let character = text[index]
+            if character == "\"", previous != "\\" {
+                inString.toggle()
+            } else if !inString {
+                if character == open {
+                    depth += 1
+                } else if character == close {
+                    depth -= 1
+                    if depth == 0 {
+                        return String(text[start...index])
+                    }
+                }
+            }
+            previous = character
+            index = text.index(after: index)
+        }
+
+        return nil
+    }
+
+    private func quoteJavaScriptObjectKeys(_ objectText: String) -> String {
+        var result = ""
+        var inString = false
+        var previous: Character?
+        let characters = Array(objectText)
+        var index = 0
+
+        while index < characters.count {
+            let character = characters[index]
+            if character == "\"", previous != "\\" {
+                inString.toggle()
+                result.append(character)
+                previous = character
+                index += 1
+                continue
+            }
+
+            if !inString,
+               (character == "{" || character == ",") {
+                result.append(character)
+                var lookahead = index + 1
+                while lookahead < characters.count, characters[lookahead].isWhitespace {
+                    result.append(characters[lookahead])
+                    lookahead += 1
+                }
+
+                let keyStart = lookahead
+                while lookahead < characters.count,
+                      (characters[lookahead].isLetter || characters[lookahead].isNumber || characters[lookahead] == "_") {
+                    lookahead += 1
+                }
+
+                if lookahead > keyStart, lookahead < characters.count, characters[lookahead] == ":" {
+                    result.append("\"")
+                    result.append(contentsOf: characters[keyStart..<lookahead])
+                    result.append("\":")
+                    index = lookahead + 1
+                    previous = ":"
+                    continue
+                }
+            }
+
+            result.append(character)
+            previous = character
+            index += 1
+        }
+
+        return result
+    }
+
+    private func decimal(from value: Any?) -> Decimal? {
+        switch value {
+        case let value as Double:
+            return Decimal(value)
+        case let value as Int:
+            return Decimal(value)
+        case let value as String:
+            return Decimal(string: value)
+        default:
+            return nil
+        }
+    }
+
+    private func int(from value: Any?) -> Int? {
+        switch value {
+        case let value as Int:
+            return value
+        case let value as Double:
+            return Int(value)
+        case let value as String:
+            return Int(value)
+        default:
+            return nil
+        }
+    }
+
+    private func date(from value: Any?) -> Date? {
+        guard let value = value as? String else { return nil }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: value)
+    }
+
     private func nextDataJSON(from html: String) -> Data? {
         let startMarker = "<script id=\"__NEXT_DATA__\" type=\"application/json\">"
         let endMarker = "</script>"
@@ -744,12 +786,14 @@ enum PriceError: LocalizedError {
     case notConfigured
     case noData
     case rateLimited
+    case sourceUnavailable(String)
 
     var errorDescription: String? {
         switch self {
         case .notConfigured: "FMP API key not configured. Go to Settings to add it."
         case .noData: "No price data available for this security."
         case .rateLimited: "API rate limit reached. Try again later."
+        case let .sourceUnavailable(message): message
         }
     }
 }

@@ -10,6 +10,12 @@ final class SecurityMetadata {
     var analystTargetHigh: Decimal?
     var analystTargetCurrencyRaw: String = ""
     var analystTargetUpdatedAt: Date?
+    var analystConsensusRatingRaw: String?
+    var analystRatingScore: Decimal?
+    var analystRatingCount: Int?
+    var analystRatingSource: String?
+    var analystRatingError: String?
+    var analystRatingUpdatedAt: Date?
 
     @Relationship(inverse: \Holding.securityMetadata)
     var holdings: [Holding]

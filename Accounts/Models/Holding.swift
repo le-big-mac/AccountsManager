@@ -46,6 +46,37 @@ enum HoldingAssetClass: String, CaseIterable, Identifiable {
     }
 }
 
+enum AnalystConsensusRating: String {
+    case strongBuy = "Strong Buy"
+    case buy = "Buy"
+    case hold = "Hold"
+    case sell = "Sell"
+    case strongSell = "Strong Sell"
+
+    static func from(_ value: String?) -> AnalystConsensusRating? {
+        guard let value else { return nil }
+        let normalized = value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .filter { $0.isLetter }
+
+        switch normalized {
+        case "strongbuy":
+            return .strongBuy
+        case "buy":
+            return .buy
+        case "hold":
+            return .hold
+        case "sell":
+            return .sell
+        case "strongsell":
+            return .strongSell
+        default:
+            return nil
+        }
+    }
+}
+
 @Model
 final class Holding {
     var id: UUID
@@ -146,6 +177,22 @@ final class Holding {
 
     var resolvedAnalystTargetUpdatedAt: Date? {
         securityMetadata?.analystTargetUpdatedAt ?? analystTargetUpdatedAt
+    }
+
+    var resolvedAnalystConsensusRating: AnalystConsensusRating? {
+        AnalystConsensusRating.from(securityMetadata?.analystConsensusRatingRaw)
+    }
+
+    var resolvedAnalystRatingCount: Int? {
+        securityMetadata?.analystRatingCount
+    }
+
+    var resolvedAnalystRatingUpdatedAt: Date? {
+        securityMetadata?.analystRatingUpdatedAt
+    }
+
+    var resolvedAnalystRatingError: String? {
+        securityMetadata?.analystRatingError
     }
 
     var analystTargetCurrency: String {

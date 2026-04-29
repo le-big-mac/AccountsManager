@@ -151,6 +151,21 @@ struct HoldingRow: View {
         return .secondary
     }
 
+    private func analystRatingColor(_ rating: AnalystConsensusRating) -> Color {
+        switch rating {
+        case .strongBuy:
+            return Color(red: 0.0, green: 0.35, blue: 0.12)
+        case .buy:
+            return .green
+        case .hold:
+            return .secondary
+        case .sell:
+            return .red
+        case .strongSell:
+            return Color(red: 0.45, green: 0.0, blue: 0.0)
+        }
+    }
+
     private var unitsText: String {
         if holding.assetClass == .gilt {
             return "\(holding.units.formattedCurrency(code: "GBP")) nominal"
@@ -217,17 +232,15 @@ struct HoldingRow: View {
                         }
                     }
                 }
-                if let target = holding.resolvedAnalystConsensusTarget {
-                    HStack(spacing: 4) {
-                        Text("Target \(target.formattedCurrency(code: holding.analystTargetCurrency))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        if let upside = holding.analystConsensusUpsidePercent {
-                            Text(upside.formattedPercent())
-                                .font(.caption)
-                                .foregroundStyle(percentColor(upside))
-                        }
-                    }
+                if let rating = holding.resolvedAnalystConsensusRating {
+                    Text("Analysts \(rating.rawValue)")
+                        .font(.caption)
+                        .foregroundStyle(analystRatingColor(rating))
+                } else if let error = holding.resolvedAnalystRatingError, !error.isEmpty {
+                    Text("Analyst rating unavailable")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .help(error)
                 }
             }
 

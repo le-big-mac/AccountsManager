@@ -9,7 +9,7 @@ Native macOS SwiftUI app for tracking personal cash and investments in one place
   - CSV files as the account source of truth
   - SnapTrade sync for supported brokerages
 - Prices equities, ETFs, and funds with Financial Modeling Prep
-- Stores analyst target prices for supported stocks and ETFs via Alpha Vantage
+- Stores analyst consensus ratings for supported stocks and ETFs via StockAnalysis
 - Converts non-GBP holdings to GBP for portfolio totals
 - Shows per-account detail and a combined overview
 
@@ -43,7 +43,7 @@ Current account sources:
 - Mixed-currency accounts also show the original currency breakdown
 - For CSV-backed accounts, the CSV is the source of truth and can be re-imported
 - Holdings can show open P&L percentage when an average purchase price is available
-- Analyst targets are cached in shared security metadata when available
+- Analyst consensus ratings are cached in shared security metadata when available
 
 ## Requirements
 
@@ -62,7 +62,6 @@ They are not committed to the repo.
 Supported credentials:
 
 - `FMP API Key`
-- `Alpha Vantage API Key`
 - `TrueLayer Client ID`
 - `TrueLayer Client Secret`
 - `SnapTrade Client ID`
@@ -229,19 +228,20 @@ Notes:
 - TrueLayer credit card balances export as cash liability rows, with negative values in `units`
 - the extra account/source columns are informational; the current generic importer ignores them
 
-## Analyst Targets
+## Analyst Ratings
 
-Analyst targets are optional enrichment for holdings with a ticker and asset class `stock` or `etf`.
+Analyst consensus ratings are optional enrichment for holdings with a ticker and asset class `stock` or `etf`.
 
-- Source: Alpha Vantage `OVERVIEW`
+- Source: StockAnalysis forecast pages
 - Stored in shared security metadata and reused until stale
 - Refreshed in the background rather than blocking price updates
-- Throttled and budgeted to fit the Alpha Vantage free-tier daily cap
+- UI shows only the consensus rating: Strong Buy, Buy, Hold, Sell, or Strong Sell
+- Scrape/source errors are retained on the holding so page-shape breakage is visible in the app
 
 Current refresh policy:
 
-- if a holding has no stored target, it is eligible immediately
-- if a holding has a target, it refreshes when older than 7 days
+- if a holding has no stored rating, it is eligible immediately
+- if a holding has a rating, it refreshes when older than 1 day
 - cash and most fund/OEIC rows do not participate
 
 ## Project Structure
