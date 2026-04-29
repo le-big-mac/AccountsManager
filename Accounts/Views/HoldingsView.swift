@@ -156,11 +156,11 @@ struct HoldingRow: View {
         case .strongBuy:
             return .green
         case .buy:
-            return Color(red: 82.0 / 255.0, green: 168.0 / 255.0, blue: 104.0 / 255.0)
+            return Color(red: 60.0 / 255.0, green: 185.0 / 255.0, blue: 88.0 / 255.0)
         case .hold:
             return Color(red: 128.0 / 255.0, green: 128.0 / 255.0, blue: 134.0 / 255.0)
         case .sell:
-            return Color(red: 205.0 / 255.0, green: 100.0 / 255.0, blue: 70.0 / 255.0)
+            return Color(red: 220.0 / 255.0, green: 88.0 / 255.0, blue: 50.0 / 255.0)
         case .strongSell:
             return robinhoodLossColor
         }
