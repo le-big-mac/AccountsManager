@@ -417,12 +417,10 @@ enum GiltCalculator {
     private static func exDividendDate(for paymentDate: Date) -> Date {
         var date = paymentDate
         var businessDays = 0
-        let calendar = Calendar.gregorianUTC
 
         while businessDays < 7 {
-            date = calendar.date(byAdding: .day, value: -1, to: date) ?? date
-            let weekday = calendar.component(.weekday, from: date)
-            if weekday != 1 && weekday != 7 {
+            date = Calendar.gregorianUTC.date(byAdding: .day, value: -1, to: date) ?? date
+            if UKBankHolidayCalendar.isBusinessDay(date) {
                 businessDays += 1
             }
         }
@@ -477,6 +475,109 @@ enum GiltCalculator {
         }
 
         return total
+    }
+}
+
+enum UKBankHolidayCalendar {
+    static func isBusinessDay(_ date: Date) -> Bool {
+        let calendar = Calendar.gregorianUTC
+        let weekday = calendar.component(.weekday, from: date)
+        guard weekday != 1 && weekday != 7 else { return false }
+        return !bankHolidays(for: calendar.component(.year, from: date)).contains(startOfDay(date))
+    }
+
+    private static func bankHolidays(for year: Int) -> Set<Date> {
+        var holidays = Set<Date>()
+
+        holidays.insert(observedFixedHoliday(year: year, month: 1, day: 1))
+
+        let easter = easterSunday(year: year)
+        holidays.insert(Calendar.gregorianUTC.date(byAdding: .day, value: -2, to: easter)!)
+        holidays.insert(Calendar.gregorianUTC.date(byAdding: .day, value: 1, to: easter)!)
+
+        holidays.insert(firstMonday(year: year, month: 5))
+        holidays.insert(lastMonday(year: year, month: 5))
+        holidays.insert(lastMonday(year: year, month: 8))
+
+        let christmas = date(year: year, month: 12, day: 25)
+        let boxingDay = date(year: year, month: 12, day: 26)
+        let weekday = Calendar.gregorianUTC.component(.weekday, from: christmas)
+
+        switch weekday {
+        case 1:
+            holidays.insert(date(year: year, month: 12, day: 26))
+            holidays.insert(date(year: year, month: 12, day: 27))
+        case 7:
+            holidays.insert(date(year: year, month: 12, day: 27))
+            holidays.insert(date(year: year, month: 12, day: 28))
+        default:
+            holidays.insert(christmas)
+            if Calendar.gregorianUTC.component(.weekday, from: boxingDay) == 7 {
+                holidays.insert(date(year: year, month: 12, day: 28))
+            } else {
+                holidays.insert(boxingDay)
+            }
+        }
+
+        return holidays
+    }
+
+    private static func observedFixedHoliday(year: Int, month: Int, day: Int) -> Date {
+        let holiday = date(year: year, month: month, day: day)
+        switch Calendar.gregorianUTC.component(.weekday, from: holiday) {
+        case 1:
+            return Calendar.gregorianUTC.date(byAdding: .day, value: 1, to: holiday)!
+        case 7:
+            return Calendar.gregorianUTC.date(byAdding: .day, value: 2, to: holiday)!
+        default:
+            return holiday
+        }
+    }
+
+    private static func firstMonday(year: Int, month: Int) -> Date {
+        var date = self.date(year: year, month: month, day: 1)
+        while Calendar.gregorianUTC.component(.weekday, from: date) != 2 {
+            date = Calendar.gregorianUTC.date(byAdding: .day, value: 1, to: date)!
+        }
+        return date
+    }
+
+    private static func lastMonday(year: Int, month: Int) -> Date {
+        var components = DateComponents(timeZone: TimeZone(secondsFromGMT: 0), year: year, month: month + 1, day: 0)
+        if month == 12 {
+            components = DateComponents(timeZone: TimeZone(secondsFromGMT: 0), year: year + 1, month: 1, day: 0)
+        }
+        var date = Calendar.gregorianUTC.date(from: components)!
+        while Calendar.gregorianUTC.component(.weekday, from: date) != 2 {
+            date = Calendar.gregorianUTC.date(byAdding: .day, value: -1, to: date)!
+        }
+        return date
+    }
+
+    private static func easterSunday(year: Int) -> Date {
+        let a = year % 19
+        let b = year / 100
+        let c = year % 100
+        let d = b / 4
+        let e = b % 4
+        let f = (b + 8) / 25
+        let g = (b - f + 1) / 3
+        let h = (19 * a + b - d - g + 15) % 30
+        let i = c / 4
+        let k = c % 4
+        let l = (32 + 2 * e + 2 * i - h - k) % 7
+        let m = (a + 11 * h + 22 * l) / 451
+        let month = (h + l - 7 * m + 114) / 31
+        let day = ((h + l - 7 * m + 114) % 31) + 1
+        return date(year: year, month: month, day: day)
+    }
+
+    private static func date(year: Int, month: Int, day: Int) -> Date {
+        Calendar.gregorianUTC.date(from: DateComponents(timeZone: TimeZone(secondsFromGMT: 0), year: year, month: month, day: day))!
+    }
+
+    private static func startOfDay(_ date: Date) -> Date {
+        Calendar.gregorianUTC.startOfDay(for: date)
     }
 }
 

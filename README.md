@@ -187,7 +187,7 @@ For conventional gilts:
 - `couponDates` is a semicolon-separated pair of coupon days, such as `31 Jan;31 Jul`
 - displayed value is nominal held multiplied by the refreshed clean price divided by 100
 - displayed returns are gross annual HTM yield and gross total HTM return if held to maturity
-- HTM entitlement excludes payments where settlement is on or after the seven-business-day ex-dividend date
+- HTM entitlement excludes payments where settlement is on or after the seven-business-day ex-dividend date, using an England and Wales weekday/bank-holiday calendar
 
 Other import paths still exist for older Vanguard UK, Robinhood, and Interactive Investor exports, but the generic portfolio format is the format the current app model is built around.
 
