@@ -234,14 +234,16 @@ Analyst consensus ratings are optional enrichment for holdings with a ticker and
 
 - Source: StockAnalysis forecast pages
 - Stored in shared security metadata and reused until stale
-- Refreshed in the background rather than blocking price updates
+- Refreshed on launch for missing/stale rows and during investment price syncs
 - UI shows only the consensus rating: Strong Buy, Buy, Hold, Sell, or Strong Sell
+- Rating colors follow the app's gain/loss palette, with muted colors for Buy/Sell and stronger colors for Strong Buy/Strong Sell
 - Scrape/source errors are retained on the holding so page-shape breakage is visible in the app
 
 Current refresh policy:
 
 - if a holding has no stored rating, it is eligible immediately
 - if a holding has a rating, it refreshes when older than 1 day
+- if a scrape failed before a rating was stored, it is eligible on the next launch or sync
 - cash and most fund/OEIC rows do not participate
 
 ## Project Structure
