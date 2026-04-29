@@ -27,6 +27,47 @@ struct ParsedHolding: Sendable {
     let priceCurrency: String
     let assetClass: HoldingAssetClass?
     let averagePurchasePrice: Decimal?
+    let lastPrice: Decimal?
+    let giltCouponRate: Decimal?
+    let giltMaturityDate: Date?
+    let giltSettlementDate: Date?
+    let giltCleanPricePaid: Decimal?
+    let giltDirtyPricePaid: Decimal?
+    let giltCouponDates: String?
+
+    init(
+        name: String,
+        ticker: String?,
+        isin: String?,
+        sedol: String?,
+        units: Decimal,
+        priceCurrency: String,
+        assetClass: HoldingAssetClass?,
+        averagePurchasePrice: Decimal?,
+        lastPrice: Decimal? = nil,
+        giltCouponRate: Decimal? = nil,
+        giltMaturityDate: Date? = nil,
+        giltSettlementDate: Date? = nil,
+        giltCleanPricePaid: Decimal? = nil,
+        giltDirtyPricePaid: Decimal? = nil,
+        giltCouponDates: String? = nil
+    ) {
+        self.name = name
+        self.ticker = ticker
+        self.isin = isin
+        self.sedol = sedol
+        self.units = units
+        self.priceCurrency = priceCurrency
+        self.assetClass = assetClass
+        self.averagePurchasePrice = averagePurchasePrice
+        self.lastPrice = lastPrice
+        self.giltCouponRate = giltCouponRate
+        self.giltMaturityDate = giltMaturityDate
+        self.giltSettlementDate = giltSettlementDate
+        self.giltCleanPricePaid = giltCleanPricePaid
+        self.giltDirtyPricePaid = giltDirtyPricePaid
+        self.giltCouponDates = giltCouponDates
+    }
 }
 
 struct ParsedCashBalance: Sendable {
@@ -156,6 +197,13 @@ struct CSVParser {
         let isinIdx = index["isin"]
         let sedolIdx = index["sedol"]
         let averagePurchasePriceIdx = index["averagepurchaseprice"] ?? index["averageprice"] ?? index["costbasis"]
+        let currentCleanPriceIdx = index["currentcleanprice"] ?? index["cleanprice"] ?? index["price"]
+        let couponRateIdx = index["couponrate"] ?? index["coupon"]
+        let maturityDateIdx = index["maturitydate"] ?? index["maturity"]
+        let settlementDateIdx = index["settlementdate"] ?? index["settlement"]
+        let cleanPricePaidIdx = index["cleanpricepaid"]
+        let dirtyPricePaidIdx = index["dirtypricepaid"] ?? index["dirtyprice"] ?? index["costdirtyprice"]
+        let couponDatesIdx = index["coupondates"] ?? index["coupondate"]
 
         return rows.compactMap { row in
             let assetClass = HoldingAssetClass.from(value(row, at: assetClassIdx))
@@ -173,7 +221,14 @@ struct CSVParser {
                 units: abs(units),
                 priceCurrency: value(row, at: currencyIdx).flatMap(nonEmpty) ?? "GBP",
                 assetClass: assetClass,
-                averagePurchasePrice: value(row, at: averagePurchasePriceIdx).flatMap(parseDecimal)
+                averagePurchasePrice: value(row, at: averagePurchasePriceIdx).flatMap(parseDecimal),
+                lastPrice: value(row, at: currentCleanPriceIdx).flatMap(parseDecimal),
+                giltCouponRate: value(row, at: couponRateIdx).flatMap(parsePercentDecimal),
+                giltMaturityDate: value(row, at: maturityDateIdx).flatMap(parseDate),
+                giltSettlementDate: value(row, at: settlementDateIdx).flatMap(parseDate),
+                giltCleanPricePaid: value(row, at: cleanPricePaidIdx).flatMap(parseDecimal),
+                giltDirtyPricePaid: value(row, at: dirtyPricePaidIdx).flatMap(parseDecimal),
+                giltCouponDates: value(row, at: couponDatesIdx).flatMap(nonEmpty)
             )
         }
     }
@@ -310,9 +365,37 @@ struct CSVParser {
             .replacingOccurrences(of: "£", with: "")
             .replacingOccurrences(of: "$", with: "")
             .replacingOccurrences(of: "€", with: "")
+            .replacingOccurrences(of: "%", with: "")
             .replacingOccurrences(of: ",", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return Decimal(string: cleaned)
+    }
+
+    private func parsePercentDecimal(_ value: String) -> Decimal? {
+        guard let parsed = parseDecimal(value) else { return nil }
+        if value.contains("%") || parsed >= 1 {
+            return parsed / 100
+        }
+        return parsed
+    }
+
+    private func parseDate(_ value: String) -> Date? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_GB")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+        for format in ["yyyy-MM-dd", "dd/MM/yyyy", "d/M/yyyy", "dd MMM yyyy", "d MMM yyyy", "dd MMMM yyyy", "d MMMM yyyy"] {
+            formatter.dateFormat = format
+            if let date = formatter.date(from: trimmed) {
+                return date
+            }
+        }
+
+        return nil
     }
 }
 

@@ -70,6 +70,7 @@ enum PortfolioImportService {
                 existing.units = h.units
                 existing.priceCurrency = h.priceCurrency
                 existing.averagePurchasePrice = h.averagePurchasePrice
+                applyCSVOnlyFields(h, to: existing)
                 if let assetClass = h.assetClass {
                     existing.assetClass = assetClass
                 }
@@ -84,6 +85,7 @@ enum PortfolioImportService {
                     assetClass: h.assetClass
                 )
                 holding.averagePurchasePrice = h.averagePurchasePrice
+                applyCSVOnlyFields(h, to: holding)
                 account.holdings.append(holding)
             }
         }
@@ -91,6 +93,21 @@ enum PortfolioImportService {
         account.holdings.removeAll { existing in
             activeKeys.isDisjoint(with: keys(for: existing))
         }
+    }
+
+    @MainActor
+    private static func applyCSVOnlyFields(_ parsed: ParsedHolding, to holding: Holding) {
+        if let lastPrice = parsed.lastPrice {
+            holding.lastPrice = lastPrice
+            holding.lastPriceDate = Date()
+        }
+
+        holding.giltCouponRate = parsed.giltCouponRate
+        holding.giltMaturityDate = parsed.giltMaturityDate
+        holding.giltSettlementDate = parsed.giltSettlementDate
+        holding.giltCleanPricePaid = parsed.giltCleanPricePaid
+        holding.giltDirtyPricePaid = parsed.giltDirtyPricePaid
+        holding.giltCouponDatesRaw = parsed.giltCouponDates
     }
 
     @MainActor

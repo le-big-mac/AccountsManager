@@ -27,7 +27,14 @@ enum PortfolioCSVExporter {
             "averagePurchasePrice",
             "ticker",
             "isin",
-            "sedol"
+            "sedol",
+            "currentCleanPrice",
+            "couponRate",
+            "maturityDate",
+            "settlementDate",
+            "cleanPricePaid",
+            "dirtyPricePaid",
+            "couponDates"
         ]
 
         let accountRows = accounts.sorted { $0.sortOrder < $1.sortOrder }.flatMap { account in
@@ -59,6 +66,12 @@ enum PortfolioCSVExporter {
                         "",
                         "",
                         "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
                         ""
                     ]
                 }
@@ -82,6 +95,12 @@ enum PortfolioCSVExporter {
                 "",
                 "",
                 "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
                 ""
             ]]
         case .investment:
@@ -99,7 +118,14 @@ enum PortfolioCSVExporter {
                         decimalString(holding.averagePurchasePrice),
                         holding.ticker ?? "",
                         holding.isin ?? "",
-                        holding.sedol ?? ""
+                        holding.sedol ?? "",
+                        holding.assetClass == .gilt ? decimalString(holding.lastPrice) : "",
+                        holding.assetClass == .gilt ? decimalString(holding.giltCouponRate) : "",
+                        holding.assetClass == .gilt ? dateString(holding.giltMaturityDate) : "",
+                        holding.assetClass == .gilt ? dateString(holding.giltSettlementDate) : "",
+                        holding.assetClass == .gilt ? decimalString(holding.giltCleanPricePaid) : "",
+                        holding.assetClass == .gilt ? decimalString(holding.giltDirtyPricePaid) : "",
+                        holding.assetClass == .gilt ? holding.giltCouponDatesRaw ?? "" : ""
                     ]
                 }
 
@@ -119,6 +145,12 @@ enum PortfolioCSVExporter {
                         HoldingAssetClass.cash.rawValue,
                         decimalString(cash.amount),
                         cash.currency,
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
+                        "",
                         "",
                         "",
                         "",
@@ -148,5 +180,15 @@ enum PortfolioCSVExporter {
     private static func decimalString(_ value: Decimal?) -> String {
         guard let value else { return "" }
         return NSDecimalNumber(decimal: value).stringValue
+    }
+
+    private static func dateString(_ value: Date?) -> String {
+        guard let value else { return "" }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_GB")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: value)
     }
 }

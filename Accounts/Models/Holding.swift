@@ -6,6 +6,7 @@ enum HoldingAssetClass: String, CaseIterable, Identifiable {
     case stock
     case etf
     case fund
+    case gilt
     case other
 
     var id: String { rawValue }
@@ -16,6 +17,7 @@ enum HoldingAssetClass: String, CaseIterable, Identifiable {
         case .stock: "Securities"
         case .etf: "ETFs"
         case .fund: "Funds"
+        case .gilt: "Gilts"
         case .other: "Other"
         }
     }
@@ -36,6 +38,8 @@ enum HoldingAssetClass: String, CaseIterable, Identifiable {
             return .etf
         case "fund", "funds", "mutualfund", "oeic", "unittrust":
             return .fund
+        case "gilt", "gilts", "ukgilt", "ukgilts", "treasurygilt", "treasurygilts":
+            return .gilt
         default:
             return nil
         }
@@ -62,6 +66,12 @@ final class Holding {
     var analystTargetHigh: Decimal?
     var analystTargetCurrencyRaw: String = ""
     var analystTargetUpdatedAt: Date?
+    var giltCouponRate: Decimal?
+    var giltMaturityDate: Date?
+    var giltSettlementDate: Date?
+    var giltCleanPricePaid: Decimal?
+    var giltDirtyPricePaid: Decimal?
+    var giltCouponDatesRaw: String?
     var securityMetadata: SecurityMetadata?
     var account: Account?
 
@@ -71,6 +81,9 @@ final class Holding {
 
     var localCurrentValue: Decimal {
         guard let price = lastPrice else { return 0 }
+        if assetClass == .gilt {
+            return units * price / 100
+        }
         return units * price
     }
 
@@ -155,12 +168,48 @@ final class Holding {
     }
 
     var openPnLPercent: Decimal? {
+        if assetClass == .gilt {
+            return giltMetrics?.grossTotalReturn
+        }
+
         guard let averagePurchasePrice,
               let price = lastPrice,
               averagePurchasePrice > 0 else {
             return nil
         }
         return (price - averagePurchasePrice) / averagePurchasePrice
+    }
+
+    var giltMetrics: GiltMetrics? {
+        guard assetClass == .gilt,
+              let couponRate = giltCouponRate,
+              let maturityDate = giltMaturityDate,
+              let settlementDate = giltSettlementDate,
+              let dirtyPricePaid = giltDirtyPricePaid,
+              couponRate >= 0,
+              units > 0,
+              dirtyPricePaid > 0 else {
+            return nil
+        }
+
+        let couponDates = GiltCalculator.generateCouponDates(
+            couponDateRules: giltCouponDateRules,
+            maturityDate: maturityDate,
+            settlementDate: settlementDate
+        )
+
+        return GiltCalculator.metrics(
+            nominal: units,
+            annualCouponRate: couponRate,
+            settlementDate: settlementDate,
+            maturityDate: maturityDate,
+            couponDates: couponDates,
+            dirtyPricePaid: dirtyPricePaid
+        )
+    }
+
+    private var giltCouponDateRules: [GiltCouponDateRule] {
+        GiltCouponDateRule.parse(giltCouponDatesRaw)
     }
 
     private var inferredPriceCurrency: String {
@@ -230,5 +279,217 @@ final class Holding {
         self.units = units
         self.priceCurrency = priceCurrency
         self.assetClassRaw = assetClass?.rawValue
+    }
+}
+
+struct GiltMetrics {
+    let grossHTMYield: Decimal
+    let grossTotalReturn: Decimal
+    let totalCashToMaturity: Decimal
+    let nextCouponDate: Date?
+}
+
+struct GiltCouponDateRule {
+    let month: Int
+    let day: Int
+
+    static func parse(_ rawValue: String?) -> [GiltCouponDateRule] {
+        guard let rawValue, !rawValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return []
+        }
+
+        return rawValue
+            .split(whereSeparator: { $0 == ";" || $0 == "|" })
+            .compactMap { component in
+                parseComponent(String(component))
+            }
+            .sorted {
+                if $0.month == $1.month {
+                    return $0.day < $1.day
+                }
+                return $0.month < $1.month
+            }
+    }
+
+    private static func parseComponent(_ component: String) -> GiltCouponDateRule? {
+        let trimmed = component.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.contains("-") || trimmed.contains("/") {
+            let parts = trimmed.split(whereSeparator: { $0 == "-" || $0 == "/" }).map(String.init)
+            guard parts.count == 2 else { return nil }
+
+            if let first = Int(parts[0]), let second = Int(parts[1]) {
+                if first > 12 {
+                    return GiltCouponDateRule(month: second, day: first)
+                }
+                return GiltCouponDateRule(month: first, day: second)
+            }
+        }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_GB")
+        for format in ["d MMM", "dd MMM", "d MMMM", "dd MMMM"] {
+            formatter.dateFormat = format
+            if let date = formatter.date(from: trimmed) {
+                let components = Calendar.gregorianUTC.dateComponents([.month, .day], from: date)
+                if let month = components.month, let day = components.day {
+                    return GiltCouponDateRule(month: month, day: day)
+                }
+            }
+        }
+
+        return nil
+    }
+}
+
+enum GiltCalculator {
+    static func generateCouponDates(
+        couponDateRules: [GiltCouponDateRule],
+        maturityDate: Date,
+        settlementDate: Date
+    ) -> [Date] {
+        let calendar = Calendar.gregorianUTC
+        let maturityYear = calendar.component(.year, from: maturityDate)
+        let settlementYear = calendar.component(.year, from: settlementDate)
+        let rules = couponDateRules.isEmpty
+            ? [GiltCouponDateRule(month: calendar.component(.month, from: maturityDate), day: calendar.component(.day, from: maturityDate))]
+            : couponDateRules
+
+        var dates: [Date] = []
+        for year in settlementYear...maturityYear {
+            for rule in rules {
+                guard let date = calendar.date(from: DateComponents(timeZone: TimeZone(secondsFromGMT: 0), year: year, month: rule.month, day: rule.day)),
+                      date <= maturityDate,
+                      settlementDate < exDividendDate(for: date) else {
+                    continue
+                }
+                dates.append(date)
+            }
+        }
+
+        if settlementDate < exDividendDate(for: maturityDate), !dates.contains(maturityDate) {
+            dates.append(maturityDate)
+        }
+
+        return dates.sorted()
+    }
+
+    static func metrics(
+        nominal: Decimal,
+        annualCouponRate: Decimal,
+        settlementDate: Date,
+        maturityDate: Date,
+        couponDates: [Date],
+        dirtyPricePaid: Decimal
+    ) -> GiltMetrics? {
+        let dirtyCashOutlay = nominal * dirtyPricePaid / 100
+        guard dirtyCashOutlay > 0 else { return nil }
+
+        let couponCash = nominal * normalizedCouponRate(annualCouponRate) / 2
+        let paymentDates = couponDates.filter { $0 > settlementDate && $0 <= maturityDate }
+
+        var cashFlows = [-dirtyCashOutlay]
+        var dates = [settlementDate]
+
+        for date in paymentDates {
+            let payment = calendarDay(date, equals: maturityDate) ? couponCash + nominal : couponCash
+            cashFlows.append(payment)
+            dates.append(date)
+        }
+
+        guard cashFlows.count > 1 else { return nil }
+
+        let totalCashToMaturity = cashFlows.dropFirst().reduce(Decimal(0), +)
+        let grossTotalReturn = (totalCashToMaturity - dirtyCashOutlay) / dirtyCashOutlay
+        let grossHTMYield = xirr(cashFlows: cashFlows, dates: dates) ?? 0
+
+        return GiltMetrics(
+            grossHTMYield: grossHTMYield,
+            grossTotalReturn: grossTotalReturn,
+            totalCashToMaturity: totalCashToMaturity,
+            nextCouponDate: paymentDates.first
+        )
+    }
+
+    private static func normalizedCouponRate(_ couponRate: Decimal) -> Decimal {
+        couponRate > 1 ? couponRate / 100 : couponRate
+    }
+
+    private static func exDividendDate(for paymentDate: Date) -> Date {
+        var date = paymentDate
+        var businessDays = 0
+        let calendar = Calendar.gregorianUTC
+
+        while businessDays < 7 {
+            date = calendar.date(byAdding: .day, value: -1, to: date) ?? date
+            let weekday = calendar.component(.weekday, from: date)
+            if weekday != 1 && weekday != 7 {
+                businessDays += 1
+            }
+        }
+
+        return date
+    }
+
+    private static func calendarDay(_ lhs: Date, equals rhs: Date) -> Bool {
+        Calendar.gregorianUTC.isDate(lhs, inSameDayAs: rhs)
+    }
+
+    private static func xirr(cashFlows: [Decimal], dates: [Date]) -> Decimal? {
+        guard cashFlows.count == dates.count,
+              cashFlows.contains(where: { $0 < 0 }),
+              cashFlows.contains(where: { $0 > 0 }) else {
+            return nil
+        }
+
+        var low = Decimal(string: "-0.9999") ?? -0.9999
+        var high = Decimal(10)
+        var lowNPV = npv(rate: low, cashFlows: cashFlows, dates: dates)
+        let highNPV = npv(rate: high, cashFlows: cashFlows, dates: dates)
+        guard lowNPV * highNPV <= 0 else { return nil }
+
+        for _ in 0..<120 {
+            let mid = (low + high) / 2
+            let midNPV = npv(rate: mid, cashFlows: cashFlows, dates: dates)
+
+            if abs(midNPV.doubleValue) < 0.0000001 {
+                return mid
+            }
+
+            if lowNPV * midNPV > 0 {
+                low = mid
+                lowNPV = midNPV
+            } else {
+                high = mid
+            }
+        }
+
+        return (low + high) / 2
+    }
+
+    private static func npv(rate: Decimal, cashFlows: [Decimal], dates: [Date]) -> Decimal {
+        let start = dates[0]
+        var total = Decimal(0)
+
+        for (cashFlow, date) in zip(cashFlows, dates) {
+            let years = date.timeIntervalSince(start) / (365.25 * 24 * 60 * 60)
+            let discount = pow(1 + rate.doubleValue, years)
+            total += cashFlow / Decimal(discount)
+        }
+
+        return total
+    }
+}
+
+private extension Decimal {
+    var doubleValue: Double {
+        NSDecimalNumber(decimal: self).doubleValue
+    }
+}
+
+private extension Calendar {
+    static var gregorianUTC: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        return calendar
     }
 }

@@ -158,23 +158,35 @@ Expected columns:
 
 Rules:
 
-- `assetClass` should be one of `cash`, `stock`, `etf`, or `fund`
+- `assetClass` should be one of `cash`, `stock`, `etf`, `fund`, or `gilt`
 - non-cash rows become holdings
 - `cash` rows become cash balances
 - for cash rows, the amount is stored in `units`
 - `currency` is the holding price currency or the cash currency
 - `averagePurchasePrice` is optional and stores per-unit cost basis for open P&L display
 - `ticker`, `isin`, and `sedol` are optional, but at least one identifier is useful for live pricing
+- gilt rows use `units` as nominal held and `currentCleanPrice` as the current clean price per GBP 100 nominal
+- gilt HTM calculations use `dirtyPricePaid` per GBP 100 nominal as the cost basis
 
 Example:
 
 ```csv
-name,assetClass,units,currency,averagePurchasePrice,ticker,isin,sedol
+name,assetClass,units,currency,averagePurchasePrice,ticker,isin,sedol,currentCleanPrice,couponRate,maturityDate,settlementDate,cleanPricePaid,dirtyPricePaid,couponDates
 FTSE Global All Cap Index Fund Accumulation,fund,36.9627,GBP,252.40,VAFTGAG,GB00BD3RZ582,
 Apple Inc,stock,12,USD,182.15,AAPL,US0378331005,
 USD Cash,cash,18003.45,USD,,,,
 GBP Cash,cash,130.12,GBP,,,,
+1% Treasury Gilt 2032,gilt,10000,GBP,,,,GB00BM8Z2S21,93.40,1%,2032-01-31,2026-04-29,92.80,93.15,31 Jan;31 Jul
 ```
+
+For conventional gilts:
+
+- `couponRate` is the annual coupon rate; `1%`, `1`, and `0.01` are accepted
+- `maturityDate` and `settlementDate` accept `yyyy-MM-dd`, `dd/MM/yyyy`, or UK month-name dates
+- `couponDates` is a semicolon-separated pair of coupon days, such as `31 Jan;31 Jul`
+- displayed value is nominal held multiplied by current clean price divided by 100
+- displayed returns are gross annual HTM yield and gross total HTM return if held to maturity
+- HTM entitlement excludes payments where settlement is on or after the seven-business-day ex-dividend date
 
 Other import paths still exist for older Vanguard UK, Robinhood, and Interactive Investor exports, but the generic portfolio format is the format the current app model is built around.
 
@@ -200,6 +212,13 @@ Export columns:
 - `ticker`
 - `isin`
 - `sedol`
+- `currentCleanPrice`
+- `couponRate`
+- `maturityDate`
+- `settlementDate`
+- `cleanPricePaid`
+- `dirtyPricePaid`
+- `couponDates`
 
 Notes:
 

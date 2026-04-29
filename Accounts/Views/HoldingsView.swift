@@ -151,6 +151,29 @@ struct HoldingRow: View {
         return .secondary
     }
 
+    private var unitsText: String {
+        if holding.assetClass == .gilt {
+            return "\(holding.units.formattedCurrency(code: "GBP")) nominal"
+        }
+        return "\(holding.units as NSDecimalNumber) units"
+    }
+
+    private var priceLabel: String {
+        if holding.assetClass == .gilt {
+            return "clean \(holding.priceCurrency) \(holding.lastPrice.map { NSDecimalNumber(decimal: $0).stringValue } ?? "--")/100"
+        }
+        guard let price = holding.lastPrice else { return "" }
+        return "@ \(price.formattedCurrency(code: holding.priceCurrency))"
+    }
+
+    private var maturityText: String? {
+        guard let maturityDate = holding.giltMaturityDate else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_GB")
+        formatter.dateStyle = .medium
+        return "Matures \(formatter.string(from: maturityDate))"
+    }
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
@@ -168,13 +191,30 @@ struct HoldingRow: View {
                         .lineLimit(1)
                 }
                 HStack(spacing: 4) {
-                    Text("\(holding.units as NSDecimalNumber) units")
+                    Text(unitsText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    if let price = holding.lastPrice {
-                        Text("@ \(price.formattedCurrency(code: holding.priceCurrency))")
+                    if holding.lastPrice != nil {
+                        Text(priceLabel)
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                    }
+                }
+                if holding.assetClass == .gilt {
+                    HStack(spacing: 8) {
+                        if let maturityText {
+                            Text(maturityText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        if let metrics = holding.giltMetrics {
+                            Text("HTM \(metrics.grossHTMYield.formattedPercent()) p.a.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text("Total \(metrics.grossTotalReturn.formattedPercent())")
+                                .font(.caption)
+                                .foregroundStyle(percentColor(metrics.grossTotalReturn))
+                        }
                     }
                 }
                 if let target = holding.resolvedAnalystConsensusTarget {

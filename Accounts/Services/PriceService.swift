@@ -219,6 +219,9 @@ final class PriceService {
             if index.isMultiple(of: 4) {
                 await Task.yield()
             }
+            if holding.assetClass == .gilt {
+                continue
+            }
             _ = securityMetadata(for: holding)
             do {
                 let quote: CachedQuote
@@ -520,7 +523,7 @@ final class PriceService {
         switch holding.assetClass {
         case .stock, .etf:
             return holding.ticker != nil
-        case .cash, .fund, .other:
+        case .cash, .fund, .gilt, .other:
             return false
         }
     }
