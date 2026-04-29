@@ -165,7 +165,8 @@ Rules:
 - `currency` is the holding price currency or the cash currency
 - `averagePurchasePrice` is optional and stores per-unit cost basis for open P&L display
 - `ticker`, `isin`, and `sedol` are optional, but at least one identifier is useful for live pricing
-- gilt rows use `units` as nominal held and `currentCleanPrice` as the current clean price per GBP 100 nominal
+- gilt rows use `units` as nominal held
+- gilt prices refresh from Hargreaves Lansdown by `sedol`; `currentCleanPrice` is optional and is mainly an exported cached value
 - gilt HTM calculations use `dirtyPricePaid` per GBP 100 nominal as the cost basis
 
 Example:
@@ -184,7 +185,7 @@ For conventional gilts:
 - `couponRate` is the annual coupon rate; `1%`, `1`, and `0.01` are accepted
 - `maturityDate` and `settlementDate` accept `yyyy-MM-dd`, `dd/MM/yyyy`, or UK month-name dates
 - `couponDates` is a semicolon-separated pair of coupon days, such as `31 Jan;31 Jul`
-- displayed value is nominal held multiplied by current clean price divided by 100
+- displayed value is nominal held multiplied by the refreshed clean price divided by 100
 - displayed returns are gross annual HTM yield and gross total HTM return if held to maturity
 - HTM entitlement excludes payments where settlement is on or after the seven-business-day ex-dividend date
 

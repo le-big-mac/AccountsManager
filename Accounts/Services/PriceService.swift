@@ -106,6 +106,38 @@ final class PriceService {
         let currency: String?
     }
 
+    struct HLFactsheetPage: Decodable {
+        let props: HLProps
+    }
+
+    struct HLProps: Decodable {
+        let pageProps: HLPageProps
+    }
+
+    struct HLPageProps: Decodable {
+        let investmentDetails: HLInvestmentDetails
+    }
+
+    struct HLInvestmentDetails: Decodable {
+        let sedol: String?
+        let isin: String?
+        let epicCode: String?
+        let sell: HLMoney?
+        let buy: HLMoney?
+        let close: HLMoney?
+        let previousChange: HLPreviousChange?
+    }
+
+    struct HLMoney: Decodable {
+        let currency: String?
+        let value: Decimal?
+    }
+
+    struct HLPreviousChange: Decodable {
+        let percent: Double?
+        let price: HLMoney?
+    }
+
     private var apiKey: String? {
         KeychainHelper.load(.fmpApiKey)
     }
@@ -219,13 +251,12 @@ final class PriceService {
             if index.isMultiple(of: 4) {
                 await Task.yield()
             }
-            if holding.assetClass == .gilt {
-                continue
-            }
             _ = securityMetadata(for: holding)
             do {
                 let quote: CachedQuote
-                if let vanguardQuote = try await fetchVanguardQuote(for: holding) {
+                if let giltQuote = try await fetchHLGiltQuote(for: holding) {
+                    quote = giltQuote
+                } else if let vanguardQuote = try await fetchVanguardQuote(for: holding) {
                     quote = vanguardQuote
                 } else if let fidelityQuote = try await fetchFidelityFundQuote(for: holding) {
                     quote = fidelityQuote
@@ -457,6 +488,60 @@ final class PriceService {
         return cached
     }
 
+    private func fetchHLGiltQuote(for holding: Holding) async throws -> CachedQuote? {
+        guard holding.assetClass == .gilt,
+              let sedol = holding.sedol?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !sedol.isEmpty else {
+            return nil
+        }
+
+        let normalizedSEDOL = normalizedIdentifier(sedol)
+        let cacheKey = "hl-gilt:\(normalizedSEDOL)"
+        if let cached = cache[cacheKey],
+           Date().timeIntervalSince(cached.fetchedAt) < 300 {
+            return cached
+        }
+
+        let url = URL(string: "https://www.hl.co.uk/shares/shares-search-results/\(normalizedSEDOL)")!
+        var request = URLRequest(url: url)
+        request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
+
+        let (data, _) = try await URLSession.shared.data(for: request)
+        guard let html = String(data: data, encoding: .utf8),
+              let jsonData = nextDataJSON(from: html) else {
+            throw PriceError.noData
+        }
+
+        let page = try JSONDecoder().decode(HLFactsheetPage.self, from: jsonData)
+        let details = page.props.pageProps.investmentDetails
+        guard normalizedIdentifier(details.sedol) == normalizedSEDOL || normalizedIdentifier(details.isin) == normalizedIdentifier(holding.isin) else {
+            throw PriceError.noData
+        }
+
+        let price = midPrice(sell: details.sell?.value, buy: details.buy?.value)
+            ?? details.close?.value
+        guard let price else {
+            throw PriceError.noData
+        }
+
+        let cached = CachedQuote(
+            price: price,
+            currency: normalizedCurrency(details.sell?.currency ?? details.buy?.currency ?? details.close?.currency ?? "GBP"),
+            change: details.previousChange?.price?.value ?? 0,
+            changePercent: details.previousChange?.percent ?? 0,
+            fetchedAt: Date()
+        )
+        cache[cacheKey] = cached
+
+        if let epicCode = details.epicCode, holding.ticker == nil {
+            holding.ticker = epicCode
+        }
+        if let isin = details.isin, holding.isin == nil {
+            holding.isin = isin
+        }
+        return cached
+    }
+
     private func vanguardPortId(for holding: Holding) async throws -> String? {
         let identifiers = [
             holding.ticker,
@@ -616,6 +701,19 @@ final class PriceService {
             .replacingOccurrences(of: "%", with: "")
             .replacingOccurrences(of: ",", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private func midPrice(sell: Decimal?, buy: Decimal?) -> Decimal? {
+        switch (sell, buy) {
+        case let (sell?, buy?):
+            return (sell + buy) / 2
+        case let (sell?, nil):
+            return sell
+        case let (nil, buy?):
+            return buy
+        case (nil, nil):
+            return nil
+        }
     }
 
     private func nextDataJSON(from html: String) -> Data? {
