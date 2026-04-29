@@ -576,7 +576,11 @@ final class PriceService {
     }
 
     private func needsAnalystRatingRefresh(for holding: Holding) -> Bool {
-        guard let updatedAt = securityMetadata(for: holding).analystRatingUpdatedAt else { return true }
+        let metadata = securityMetadata(for: holding)
+        if metadata.analystConsensusRatingRaw == nil, metadata.analystRatingError != nil {
+            return true
+        }
+        guard let updatedAt = metadata.analystRatingUpdatedAt else { return true }
         return Date().timeIntervalSince(updatedAt) > 24 * 60 * 60
     }
 
@@ -712,6 +716,10 @@ final class PriceService {
                     previous = ":"
                     continue
                 }
+
+                previous = character
+                index += 1
+                continue
             }
 
             result.append(character)
