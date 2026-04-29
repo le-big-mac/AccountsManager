@@ -10,10 +10,6 @@ final class PriceService {
     private var analystRatingCache: [String: CachedAnalystRating] = [:]
     private var securityMetadataCache: [String: SecurityMetadata] = [:]
     private var vanguardProductsCache: [VanguardProduct]?
-    private var analystRatingRefreshTask: Task<Void, Never>?
-    private var queuedAnalystRatingTickers: Set<String> = []
-    private var refreshedAnalystRatingTickers: Set<String> = []
-    private var pendingAnalystRatingHoldings: [Holding] = []
 
     struct CachedQuote {
         let price: Decimal
@@ -282,27 +278,35 @@ final class PriceService {
                 continue
             }
         }
-        scheduleAnalystRatingRefresh(holdings)
+        await refreshAnalystRatings(holdings)
     }
 
-    func scheduleAnalystRatingRefresh(_ holdings: [Holding]) {
+    func refreshAnalystRatings(_ holdings: [Holding]) async {
+        var refreshedTickers: Set<String> = []
         for holding in holdings {
             guard supportsAnalystRatings(for: holding),
                   needsAnalystRatingRefresh(for: holding),
                   let ticker = holding.ticker,
                   !ticker.isEmpty,
-                  !queuedAnalystRatingTickers.contains(ticker),
-                  !refreshedAnalystRatingTickers.contains(ticker) else {
+                  !refreshedTickers.contains(ticker) else {
                 continue
             }
-            queuedAnalystRatingTickers.insert(ticker)
-            pendingAnalystRatingHoldings.append(holding)
-        }
+            guard !Task.isCancelled else { return }
 
-        guard analystRatingRefreshTask == nil else { return }
-        analystRatingRefreshTask = Task { @MainActor in
-            defer { self.analystRatingRefreshTask = nil }
-            await self.refreshQueuedAnalystRatings()
+            let metadata = securityMetadata(for: holding)
+            do {
+                let rating = try await fetchStockAnalysisRating(ticker: ticker)
+                metadata.analystConsensusRatingRaw = rating.consensus
+                metadata.analystRatingScore = rating.score
+                metadata.analystRatingCount = rating.count
+                metadata.analystRatingSource = "StockAnalysis"
+                metadata.analystRatingError = nil
+                metadata.analystRatingUpdatedAt = Date()
+                refreshedTickers.insert(ticker)
+            } catch {
+                metadata.analystRatingError = "Analyst rating refresh failed: \(error.localizedDescription)"
+                refreshedTickers.insert(ticker)
+            }
         }
     }
 
@@ -314,36 +318,6 @@ final class PriceService {
                 holding.fxRateDate = Date()
             } catch {
                 continue
-            }
-        }
-    }
-
-    private func refreshQueuedAnalystRatings() async {
-        while !pendingAnalystRatingHoldings.isEmpty {
-            guard !Task.isCancelled else { return }
-            let holding = pendingAnalystRatingHoldings.removeFirst()
-            guard let ticker = holding.ticker else { continue }
-            queuedAnalystRatingTickers.remove(ticker)
-
-            guard supportsAnalystRatings(for: holding),
-                  needsAnalystRatingRefresh(for: holding) else {
-                continue
-            }
-
-            let metadata = securityMetadata(for: holding)
-            do {
-                let rating = try await fetchStockAnalysisRating(ticker: ticker)
-                metadata.analystConsensusRatingRaw = rating.consensus
-                metadata.analystRatingScore = rating.score
-                metadata.analystRatingCount = rating.count
-                metadata.analystRatingSource = "StockAnalysis"
-                metadata.analystRatingError = nil
-                metadata.analystRatingUpdatedAt = Date()
-                refreshedAnalystRatingTickers.insert(ticker)
-            } catch {
-                metadata.analystRatingError = "Analyst rating refresh failed: \(error.localizedDescription)"
-                metadata.analystRatingUpdatedAt = metadata.analystRatingUpdatedAt ?? Date()
-                refreshedAnalystRatingTickers.insert(ticker)
             }
         }
     }
@@ -561,9 +535,6 @@ final class PriceService {
         fxCache.removeAll()
         analystRatingCache.removeAll()
         securityMetadataCache.removeAll()
-        queuedAnalystRatingTickers.removeAll()
-        refreshedAnalystRatingTickers.removeAll()
-        pendingAnalystRatingHoldings.removeAll()
     }
 
     private func supportsAnalystRatings(for holding: Holding) -> Bool {
@@ -641,7 +612,7 @@ final class PriceService {
         guard let markerRange = html.range(of: "recommendations:[") else { return nil }
         let start = html.index(markerRange.upperBound, offsetBy: -1)
         guard let arrayText = balancedSubstring(in: html, from: start, open: "[", close: "]"),
-              let jsonData = quoteJavaScriptObjectKeys(arrayText).data(using: .utf8),
+              let jsonData = normalizeJavaScriptNumbers(quoteJavaScriptObjectKeys(arrayText)).data(using: .utf8),
               let recommendations = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]] else {
             return nil
         }
@@ -728,6 +699,12 @@ final class PriceService {
         }
 
         return result
+    }
+
+    private func normalizeJavaScriptNumbers(_ objectText: String) -> String {
+        objectText
+            .replacingOccurrences(of: ":.", with: ":0.")
+            .replacingOccurrences(of: ":-.", with: ":-0.")
     }
 
     private func decimal(from value: Any?) -> Decimal? {

@@ -191,12 +191,14 @@ struct AccountDetailView: View {
         defer { isRefreshing = false }
         if account.investmentSourceType == .snapTrade {
             try? await SnapTradeImportService.sync(account: account, refreshConnection: true)
+            try? modelContext.save()
             return
         }
 
         await PortfolioImportService.refreshLinkedCSV(for: account)
         await PriceService.shared.refreshHoldings(account.holdings)
         await PriceService.shared.refreshCashBalances(account.cashBalances)
+        try? modelContext.save()
     }
 
     private func syncBalance() async {

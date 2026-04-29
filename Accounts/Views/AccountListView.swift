@@ -22,6 +22,7 @@ struct AccountListView: View {
     @State private var draggedAccount: Account?
     @State private var dropTargetAccountID: UUID?
     @State private var hasMigratedSecurityMetadata = false
+    @State private var hasRefreshedAnalystRatingsOnLaunch = false
     @State private var exportAlert: ExportAlert?
     @FocusState private var isSidebarFocused: Bool
 
@@ -120,6 +121,7 @@ struct AccountListView: View {
         .onAppear {
             normalizeSortOrderIfNeeded()
             migrateSecurityMetadataIfNeeded()
+            refreshAnalystRatingsOnLaunchIfNeeded()
             DispatchQueue.main.async {
                 isSidebarFocused = true
             }
@@ -355,6 +357,20 @@ struct AccountListView: View {
         }
     }
 
+    private func refreshAnalystRatingsOnLaunchIfNeeded() {
+        guard !hasRefreshedAnalystRatingsOnLaunch else { return }
+        hasRefreshedAnalystRatingsOnLaunch = true
+
+        let holdings = accounts
+            .filter { $0.accountType == .investment }
+            .flatMap { $0.holdings }
+
+        Task {
+            await PriceService.shared.refreshAnalystRatings(holdings)
+            try? modelContext.save()
+        }
+    }
+
     private func holdingIdentifierKey(for holding: Holding) -> String {
         if let ticker = normalizedIdentifier(holding.ticker), !ticker.isEmpty {
             return "ticker:\(ticker)"
@@ -500,6 +516,8 @@ struct AccountListView: View {
             }
             await Task.yield()
         }
+
+        try? modelContext.save()
     }
 }
 

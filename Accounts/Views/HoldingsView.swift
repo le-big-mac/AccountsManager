@@ -154,15 +154,15 @@ struct HoldingRow: View {
     private func analystRatingColor(_ rating: AnalystConsensusRating) -> Color {
         switch rating {
         case .strongBuy:
-            return Color(red: 0.0, green: 0.35, blue: 0.12)
+            return Color(red: 0.0 / 255.0, green: 122.0 / 255.0, blue: 61.0 / 255.0)
         case .buy:
-            return .green
+            return Color(red: 46.0 / 255.0, green: 159.0 / 255.0, blue: 77.0 / 255.0)
         case .hold:
-            return .secondary
+            return Color(red: 128.0 / 255.0, green: 128.0 / 255.0, blue: 134.0 / 255.0)
         case .sell:
-            return .red
+            return robinhoodLossColor
         case .strongSell:
-            return Color(red: 0.45, green: 0.0, blue: 0.0)
+            return Color(red: 180.0 / 255.0, green: 35.0 / 255.0, blue: 24.0 / 255.0)
         }
     }
 
@@ -233,7 +233,7 @@ struct HoldingRow: View {
                     }
                 }
                 if let rating = holding.resolvedAnalystConsensusRating {
-                    Text("Analysts \(rating.rawValue)")
+                    Text(rating.rawValue)
                         .font(.caption)
                         .foregroundStyle(analystRatingColor(rating))
                 } else if let error = holding.resolvedAnalystRatingError, !error.isEmpty {
